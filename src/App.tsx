@@ -1,13 +1,17 @@
 import { useState, Suspense, useEffect } from 'react';
 import Scene from './components/Scene';
 import WeatherDashboard, { getWmoDescription } from './components/WeatherDashboard';
+import ScreenDrops from './components/ScreenDrops';
 import { MapPin, Clock, Loader2 } from 'lucide-react';
 
 export default function App() {
   const [weatherCondition, setWeatherCondition] = useState('clear');
   const [weatherData, setWeatherData] = useState<any>(null);
+  const [mqttData, setMqttData] = useState<any>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState('');
+  const [sceneTime, setSceneTime] = useState(() => new Date().getTime());
 
+  // 1. Fetch OpenMeteo Data
   useEffect(() => {
     const fetchWeather = async () => {
       try {
@@ -15,7 +19,9 @@ export default function App() {
         const data = await res.json();
         
         setWeatherData(data);
-        setLastUpdateTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const now = new Date();
+        setLastUpdateTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setSceneTime(now.getTime());
         
         // Map WMO code to our internal 3D scene condition
         const code = data.current.weather_code;
@@ -40,6 +46,24 @@ export default function App() {
     const interval = setInterval(fetchWeather, 900000);
     return () => clearInterval(interval);
   }, []);
+
+  // 2. Open Server-Sent Events stream for MQTT Loop
+  useEffect(() => {
+     const evtSource = new EventSource('/api/weather/live');
+     
+     evtSource.onmessage = (event) => {
+        try {
+           const parsed = JSON.parse(event.data);
+           setMqttData(parsed);
+        } catch(e) {}
+     };
+     
+     evtSource.onerror = (err) => {
+        console.error("SSE Error:", err);
+     }
+     
+     return () => evtSource.close();
+  }, []);
   
   const liveDesc = weatherData ? getWmoDescription(weatherData.current.weather_code) : 'Loading...';
 
@@ -47,23 +71,32 @@ export default function App() {
     <div className="relative w-[100dvw] h-[100dvh] overflow-hidden bg-sky-900 font-sans text-white overscroll-none" style={{ touchAction: 'none' }}>
       {/* 3D Background */}
       <div className="absolute inset-0 z-0 cursor-move touch-none" style={{ touchAction: 'none' }}>
-         <Scene condition={weatherCondition} />
+         <Scene 
+           wmoCode={weatherData?.current?.weather_code ?? 0}
+           currentTime={sceneTime}
+           sunriseTime={weatherData?.daily?.sunrise?.[0] ? new Date(weatherData.daily.sunrise[0]).getTime() : undefined}
+           sunsetTime={weatherData?.daily?.sunset?.[0] ? new Date(weatherData.daily.sunset[0]).getTime() : undefined}
+           windSpeedMph={mqttData ? parseFloat(mqttData.windSpeed_mph) : weatherData?.current?.wind_speed_10m}
+         />
       </div>
+
+      {/* Screen Rain Splashes */}
+      <ScreenDrops wmoCode={weatherData?.current?.weather_code ?? 0} />
 
       {/* UI Overlay - Using flex col to push Dashboard to bottom, add pt- safe area for iOS notch */}
       <div className="absolute inset-0 z-10 flex flex-col justify-between p-2 lg:p-6 pointer-events-none pt-[env(safe-area-inset-top,8px)]">
         
         {/* Top Header */}
         <header className="pointer-events-auto flex flex-row items-start justify-between gap-1 w-full shrink-0">
-          <div className="backdrop-blur-xl bg-black/60 p-2 lg:p-4 rounded-none border-l-4 border-white shadow-2xl transition-all">
+          <div className="backdrop-blur-xl bg-black/60 p-2 lg:p-4 rounded-none border-l-4 border-[#10b981] shadow-2xl transition-all">
             <div className="flex flex-col gap-0.5 lg:gap-1.5 opacity-80">
               <div className="flex items-center gap-1 text-white text-[8px] lg:text-sm font-sans uppercase tracking-widest">
                 <MapPin size={10} />
                 <span>Downham Market, Fincham</span>
               </div>
-              <div className="flex items-center gap-1 text-white text-[7px] lg:text-xs font-sans uppercase tracking-widest">
+              <div className="flex items-center gap-1 text-emerald-400 text-[7px] lg:text-xs font-sans uppercase tracking-widest">
                 <Clock size={8} />
-                <span>Last updated: {lastUpdateTime || 'Fetching...'}</span>
+                <span>{mqttData ? 'MQTT Connected (Live Loop Data)' : 'Fetching API Fallback...'}</span>
               </div>
             </div>
           </div>
@@ -80,7 +113,7 @@ export default function App() {
         </header>
 
         {/* Bottom UI Dashboard row */}
-        <WeatherDashboard condition={weatherCondition} realData={weatherData} />
+        <WeatherDashboard condition={weatherCondition} realData={weatherData} mqttData={mqttData} />
       </div>
     </div>
   );
