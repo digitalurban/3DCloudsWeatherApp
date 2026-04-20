@@ -16,7 +16,7 @@ export default function App() {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum&wind_speed_unit=mph&timezone=Europe%2FLondon');
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,precipitation_probability_max&wind_speed_unit=mph&timezone=Europe%2FLondon');
         const data = await res.json();
         
         setWeatherData(data);
@@ -94,7 +94,7 @@ export default function App() {
         
         {/* Top Header */}
         <header className="pointer-events-auto flex flex-row items-start justify-between gap-1 w-full shrink-0">
-          <div className="backdrop-blur-xl bg-black/60 p-2 lg:p-4 rounded-none border-l-4 border-[#10b981] shadow-2xl transition-all">
+          <div className="backdrop-blur-xl bg-black/60 p-2 lg:p-4 rounded-none border-l-2 border-white/20 shadow-2xl transition-all">
             <div className="flex flex-col gap-0.5 lg:gap-1.5 opacity-80">
               <div className="flex items-center gap-1 text-white text-[8px] lg:text-sm font-sans uppercase tracking-widest">
                 <MapPin size={10} />
@@ -108,7 +108,7 @@ export default function App() {
           </div>
           
           <div className="flex flex-col items-end gap-1">
-            <div className="backdrop-blur-xl bg-black/60 p-1 lg:p-3 shadow-2xl text-right shrink-0 border-r-4 border-white flex flex-col items-end">
+            <div className="backdrop-blur-xl bg-black/60 p-1 lg:p-3 shadow-2xl text-right shrink-0 border-r-2 border-white/20 flex flex-col items-end">
                  <span className="block text-[7px] lg:text-[10px] font-sans uppercase tracking-[0.2em] text-white/60 mb-0.5">Live Weather</span>
                  <span className="block text-[10px] lg:text-base font-serif italic whitespace-nowrap">{liveDesc}</span>
                  {lastUpdateTime && (
@@ -127,7 +127,7 @@ export default function App() {
                    </span>
                  )}
             </div>
-            <div className="hidden md:block text-[8px] lg:text-xs font-sans uppercase tracking-widest bg-black/60 backdrop-blur-xl px-2 py-1 lg:px-3 lg:py-1.5 border border-white/20 text-white select-none">
+            <div className="hidden md:block text-[6px] lg:text-[8px] font-sans uppercase tracking-widest bg-black/60 backdrop-blur-xl px-1.5 py-0.5 lg:px-2 lg:py-1 border border-white/20 text-white/70 select-none">
               Drag & Pinch to explore
             </div>
           </div>
