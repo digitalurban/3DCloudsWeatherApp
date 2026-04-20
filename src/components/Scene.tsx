@@ -2,6 +2,7 @@ import React, { useRef, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Sky, Clouds, Cloud, OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
+import { useSpring, animated } from '@react-spring/three';
 
 function Snow() {
   const flakeCount = 6000;
@@ -151,6 +152,59 @@ function CloudDrifter({ children, windSpeed }: { children: React.ReactNode, wind
     }
   });
   return <group ref={ref}>{children}</group>;
+}
+
+function SmoothLighting({ 
+  ambIntensity, 
+  dirIntensity, 
+  sunY, 
+  finalDirLightColor,
+  isDay
+}: { 
+  ambIntensity: number, 
+  dirIntensity: number, 
+  sunY: number, 
+  finalDirLightColor: string,
+  isDay: boolean 
+}) {
+  const springs = useSpring({
+      ambInt: ambIntensity,
+      dirInt: dirIntensity,
+      sunTopPos: Math.max(10, sunY),
+      config: { mass: 1, tension: 30, friction: 15 } // Very smooth, slow fade, no bounce
+  });
+
+  return (
+    <>
+      <animated.ambientLight intensity={springs.ambInt} />
+      <animated.directionalLight 
+        position={springs.sunTopPos.to(y => [-100, y, 100]) as any} 
+        intensity={springs.dirInt} 
+        color={finalDirLightColor} 
+      />
+      <directionalLight position={[10, 10, -10]} intensity={isDay ? 0.3 : 0.05} color={finalDirLightColor} />
+    </>
+  );
+}
+
+function AnimatedHalo({ targetRadius, isDuskDawn }: { targetRadius: number, isDuskDawn: boolean }) {
+  const { radius } = useSpring({
+      radius: targetRadius,
+      config: { mass: 1, tension: 40, friction: 15 }
+  });
+
+  return (
+    <animated.mesh scale={radius.to(r => [r/10, r/10, r/10])}>
+      <sphereGeometry args={[10, 32, 32]} />
+      <meshBasicMaterial 
+         color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
+         transparent 
+         opacity={isDuskDawn ? 0.4 : 0.15} 
+         blending={THREE.AdditiveBlending} 
+         depthWrite={false}
+      />
+    </animated.mesh>
+  );
 }
 
 export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, windSpeedMph, solarRadiation, rainRate }: { wmoCode: number, currentTime?: number, sunriseTime?: number, sunsetTime?: number, windSpeedMph?: number, solarRadiation?: number, rainRate?: number }) {
@@ -331,13 +385,13 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
         )}
         <Sky {...skyParams} />
         
-        <ambientLight intensity={ambIntensity} />
-        <directionalLight 
-          position={[-100, Math.max(10, sunY), 100]} 
-          intensity={dirIntensity} 
-          color={finalDirLightColor} 
+        <SmoothLighting 
+          ambIntensity={ambIntensity} 
+          dirIntensity={dirIntensity} 
+          sunY={Math.max(10, sunY)} 
+          finalDirLightColor={finalDirLightColor} 
+          isDay={isDay} 
         />
-        <directionalLight position={[10, 10, -10]} intensity={isDay ? 0.3 : 0.05} color={finalDirLightColor} />
 
         {/* Clouds container */}
         <CloudDrifter windSpeed={windSpeedMph}>
@@ -353,19 +407,10 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
                <meshBasicMaterial color={isDuskDawn ? "#ffaa33" : "#ffffff"} />
              </mesh>
              {/* Dynamic Solar Radiation Halo */}
-             <mesh>
-               <sphereGeometry args={[
-                 solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10, 
-                 32, 32
-               ]} />
-               <meshBasicMaterial 
-                  color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
-                  transparent 
-                  opacity={isDuskDawn ? 0.4 : 0.15} 
-                  blending={THREE.AdditiveBlending} 
-                  depthWrite={false}
-               />
-             </mesh>
+             <AnimatedHalo 
+                targetRadius={solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10} 
+                isDuskDawn={isDuskDawn}
+             />
           </group>
         )}
 
