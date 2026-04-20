@@ -1,6 +1,43 @@
-import { CloudRain, Sun, Wind, Droplets, Cloud as CloudIcon, ThermometerSun, Eye, Gauge, SunDim, Sunrise } from 'lucide-react';
-import React from 'react';
+import { CloudRain, Sun, Wind, Droplets, Cloud as CloudIcon, ThermometerSun, Eye, Gauge, SunDim, Sunrise, Navigation, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+
+function useContinuousRotation(targetDegree: number | undefined) {
+  const [rotation, setRotation] = useState(targetDegree ?? 0);
+  
+  useEffect(() => {
+    if (targetDegree === undefined) return;
+    setRotation(prev => {
+        // Find shortest path to target degree to prevent backwards spinning
+        let delta = targetDegree - (prev % 360);
+        // Adjust for negative modulo in JS
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+        return prev + delta;
+    });
+  }, [targetDegree]);
+  
+  return rotation;
+}
+
+const CompassRose = ({ degree }: { degree: number | undefined }) => {
+    const rotation = useContinuousRotation(degree);
+    return (
+        <div className="relative w-7 h-7 lg:w-9 lg:h-9 rounded-full border border-white/20 flex items-center justify-center ml-2 bg-black/20 shrink-0">
+             <div className="absolute top-0 w-full text-center text-[5px] lg:text-[6px] font-sans text-white/40 leading-none pt-0.5">N</div>
+             <div className="absolute right-0.5 h-full flex items-center text-[5px] lg:text-[6px] font-sans text-white/40 leading-none">E</div>
+             <div className="absolute bottom-0 w-full text-center text-[5px] lg:text-[6px] font-sans text-white/40 leading-none pb-0.5">S</div>
+             <div className="absolute left-0.5 h-full flex items-center text-[5px] lg:text-[6px] font-sans text-white/40 leading-none">W</div>
+             <motion.div 
+               animate={{ rotate: rotation }}
+               transition={{ type: "spring", stiffness: 40, damping: 15 }}
+               className="text-emerald-400 z-10"
+             >
+                <Navigation className="w-3 h-3 lg:w-4 lg:h-4" fill="currentColor" />
+             </motion.div>
+        </div>
+    );
+};
 
 export const getWmoDescription = (code: number) => {
   if (code === 0) return 'Clear skies';
@@ -17,28 +54,35 @@ export const getWmoDescription = (code: number) => {
   return 'Unknown';
 };
 
-const Card = ({ title, icon: Icon, value, unit, sub }: { title: string, icon: any, value: string | React.ReactNode, unit?: string, sub?: string }) => (
+const Card = ({ title, icon: Icon, value, unit, sub, rightElement }: { title: string, icon: any, value: string | React.ReactNode, unit?: string, sub?: string | React.ReactNode, rightElement?: React.ReactNode }) => (
   <div className="backdrop-blur-xl bg-black/60 border border-white/20 p-2 md:p-3 lg:p-4 flex flex-col text-white shadow-2xl transition-all duration-300 hover:bg-black/80 flex-[0_0_auto] md:flex-1 min-w-[90px] md:min-w-0 snap-start">
     <div className="flex items-center justify-between mb-1 lg:mb-2 pb-1 border-b border-white/20">
       <span className="text-[8px] md:text-[10px] lg:text-[11px] font-sans uppercase tracking-[0.1em] lg:tracking-[0.2em] line-clamp-1 truncate mr-1">{title}</span>
       <Icon size={12} className="text-[#10b981] opacity-90 shrink-0 lg:w-3.5 lg:h-3.5" />
     </div>
-    <div className="text-xs md:text-base lg:text-xl font-serif tracking-tight truncate flex items-baseline relative min-h-[1.2rem] gap-[0.2em]">
-       <AnimatePresence mode="popLayout">
-         <motion.span
-           key={String(value)}
-           initial={{ opacity: 0, y: 5, filter: 'blur(2px)' }}
-           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-           exit={{ opacity: 0, y: -5, filter: 'blur(2px)' }}
-           transition={{ duration: 0.4, ease: "easeOut" }}
-           className="inline-block"
-         >
-           {value}
-         </motion.span>
-       </AnimatePresence>
-       {unit && <span className="inline-block">{unit.trim()}</span>}
+    <div className="flex items-center">
+        <div className="text-xs md:text-base lg:text-xl font-serif tracking-tight truncate flex items-baseline relative min-h-[1.2rem] gap-[0.2em]">
+           <AnimatePresence mode="popLayout">
+             <motion.span
+               key={String(value)}
+               initial={{ opacity: 0, y: 5, filter: 'blur(2px)' }}
+               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+               exit={{ opacity: 0, y: -5, filter: 'blur(2px)' }}
+               transition={{ duration: 0.4, ease: "easeOut" }}
+               className="inline-block"
+             >
+               {value}
+             </motion.span>
+           </AnimatePresence>
+           {unit && <span className="inline-block">{unit.trim()}</span>}
+        </div>
+        {rightElement && (
+            <div className="ml-auto">
+                {rightElement}
+            </div>
+        )}
     </div>
-    {sub && <div className="mt-0.5 lg:mt-1 text-[7px] md:text-[8px] lg:text-[9px] font-sans uppercase tracking-widest opacity-60 truncate relative min-h-[1.2em]">{sub}</div>}
+    {sub && <div className="mt-0.5 lg:mt-1 text-[7px] md:text-[8px] lg:text-[9px] font-sans uppercase tracking-widest opacity-60 truncate relative min-h-[1.2em] flex items-center">{sub}</div>}
   </div>
 );
 
@@ -69,12 +113,12 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   const rainSub = mqttData?.rainRate_mm_per_hour && parseFloat(mqttData.rainRate_mm_per_hour) > 0 
       ? `Rate: ${mqttData.rainRate_mm_per_hour} mm/hr` : 'Today';
 
-  const windVal = mqttData?.windSpeed_mph ? mqttData.windSpeed_mph 
-      : realData ? Math.round(realData.current.wind_speed_10m) : '--';
+  const windDirDegree = mqttData?.windDir ? Math.round(parseFloat(mqttData.windDir)) : undefined;
+  
+  const windVal = mqttData?.windSpeed_mph ? mqttData.windSpeed_mph : realData ? Math.round(realData.current.wind_speed_10m) : '--';
       
   const gustStr = mqttData?.windGust10 && parseFloat(mqttData.windGust10) > 0 ? ` • Gust ${Math.round(parseFloat(mqttData.windGust10))}` : '';
-  const windDir = mqttData?.windDir ? `DIR ${Math.round(parseFloat(mqttData.windDir))}°${gustStr}` 
-      : 'API Winds';
+  const windDir = mqttData?.windDir ? `DIR ${windDirDegree}°${gustStr}` : 'API Winds';
 
   const humidityVal = mqttData?.outHumidity ? Math.round(parseFloat(mqttData.outHumidity)) 
       : realData ? realData.current.relative_humidity_2m : '--';
@@ -87,6 +131,44 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
       
   const pressureVal = mqttData?.barometer_mbar ? Math.round(parseFloat(mqttData.barometer_mbar)) 
       : realData ? Math.round(realData.current.surface_pressure) : '--';
+      
+  let baroSub = "MSL";
+  let baroRightElement = undefined;
+  
+  if (mqttData?.barotrend !== undefined) {
+      let trendVal;
+      // Handle the fact it might arrive as a JSON object like {"trend": -1} or a raw value
+      if (typeof mqttData.barotrend === 'object' && mqttData.barotrend !== null) {
+          trendVal = Object.values(mqttData.barotrend)[0] as number;
+      } else {
+          trendVal = parseFloat(mqttData.barotrend);
+      }
+      
+      if (!isNaN(trendVal)) {
+          baroSub = `Trend: ${trendVal > 0 ? '+' : ''}${trendVal.toFixed(1)}/h`;
+          
+          let TrendIcon = Minus;
+          let trendColor = "text-white/60";
+          
+          if (trendVal >= 0.5) {
+              TrendIcon = TrendingUp;
+              trendColor = "text-emerald-400";
+          } else if (trendVal <= -0.5) {
+              TrendIcon = TrendingDown;
+              trendColor = "text-red-400";
+          }
+          
+          baroRightElement = (
+              <motion.div 
+                 initial={{ opacity: 0, scale: 0.5 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 className={`ml-2 bg-black/20 p-1 lg:p-1.5 rounded-full border border-white/10 ${trendColor}`}
+              >
+                  <TrendIcon size={14} className="lg:w-4 lg:h-4" />
+              </motion.div>
+          );
+      }
+  }
   
   const description = realData ? getWmoDescription(realData.current.weather_code) : 'Loading...';
   
@@ -146,11 +228,11 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
       <div className="flex flex-nowrap overflow-x-auto gap-[1px] bg-white/20 p-[1px] w-full shadow-2xl scrollbar-hide snap-x scroll-smooth">
         <Card title="Temperature" icon={ThermometerSun} value={tempVal} unit="°C" sub={tempSub} />
         <Card title="Precipitation" icon={Droplets} value={precipVal} unit=" mm" sub={rainSub} />
-        <Card title="Wind" icon={Wind} value={windVal} unit=" mph" sub={windDir} />
+        <Card title="Wind" icon={Wind} value={windVal} unit=" mph" sub={windDir} rightElement={<CompassRose degree={windDirDegree} />} />
         <Card title="Humidity" icon={CloudIcon} value={humidityVal} unit="%" sub="Relative" />
         <Card title="UV Index" icon={SunDim} value={uvVal} sub="Live" />
         <Card title={mqttData ? "Cloudbase" : "Visibility"} icon={Eye} value={cloudbaseVal} unit={mqttData ? " m" : " km"} sub="Above ground" />
-        <Card title="Pressure" icon={Gauge} value={pressureVal} unit=" hPa" sub="MSL" />
+        <Card title="Pressure" icon={Gauge} value={pressureVal} unit=" hPa" sub={baroSub} rightElement={baroRightElement} />
         <Card title="Sun" icon={Sunrise} value={sunStr} sub="Rise • Set" />
       </div>
     </div>

@@ -56,6 +56,7 @@ export default function App() {
         try {
            const parsed = JSON.parse(event.data);
            setMqttData(parsed);
+           setLastUpdateTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         } catch(e) {}
      };
      
@@ -112,8 +113,19 @@ export default function App() {
                  <span className="block text-[7px] lg:text-[10px] font-sans uppercase tracking-[0.2em] text-white/60 mb-0.5">Live Weather</span>
                  <span className="block text-[10px] lg:text-base font-serif italic whitespace-nowrap">{liveDesc}</span>
                  {lastUpdateTime && (
-                   <span className="block text-[6px] lg:text-[9px] font-sans uppercase tracking-widest text-[#a0aec0] mt-1 opacity-60">
-                     API Updated: {lastUpdateTime}
+                   <span className="block text-[6px] lg:text-[9px] font-sans uppercase tracking-widest text-emerald-400 mt-1 opacity-80 relative overflow-hidden h-[1.2em]">
+                     <AnimatePresence mode="popLayout">
+                       <motion.span
+                         key={lastUpdateTime}
+                         initial={{ opacity: 0, y: 5 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         exit={{ opacity: 0, y: -5 }}
+                         transition={{ duration: 0.3 }}
+                         className="absolute right-0"
+                       >
+                         Updated: {lastUpdateTime}
+                       </motion.span>
+                     </AnimatePresence>
                    </span>
                  )}
             </div>

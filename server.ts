@@ -24,13 +24,31 @@ async function startServer() {
     client.subscribe('personal/ucfnaps/downhamweather/loop', (err) => {
       if (!err) console.log('📡 Subscribed to loop topic');
     });
+    client.subscribe('personal/ucfnaps/downhamweather/barotrend', (err) => {
+      if (!err) console.log('📡 Subscribed to barotrend topic');
+    });
   });
 
   client.on('message', (topic, message) => {
     try {
-      latestMqttData = JSON.parse(message.toString());
+      const payloadStr = message.toString();
+      if (topic === 'personal/ucfnaps/downhamweather/loop') {
+          // The loop sends a full JSON payload, merge it while keeping barotrend
+          const parsed = JSON.parse(payloadStr);
+          latestMqttData = { ...latestMqttData, ...parsed };
+      } else if (topic === 'personal/ucfnaps/downhamweather/barotrend') {
+          // Try to parse as JSON just in case, otherwise treat as string/number value
+          let val = payloadStr;
+          try {
+              // some payloads are like '{"trend": -0.1}' but let's just assign direct if it's raw
+              val = JSON.parse(payloadStr);
+          } catch(e) {}
+          
+          if (!latestMqttData) latestMqttData = {};
+          latestMqttData.barotrend = val;
+      }
     } catch(e) {
-      console.error("Failed to parse MQTT message", e);
+      console.error(`Failed to handle MQTT message for ${topic}`, e);
     }
   });
 

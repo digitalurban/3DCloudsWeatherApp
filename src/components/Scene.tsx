@@ -144,10 +144,10 @@ function CloudDrifter({ children, windSpeed }: { children: React.ReactNode, wind
   useFrame((state, delta) => {
     if (ref.current) {
       // Scale wind speed: default to 10mph if missing. 
-      // Lowered multiplier from 0.002 to 0.0005 to make clouds feel heavier and slower
+      // Lowered multiplier from 0.0005 to 0.00008 to make clouds drift much slower and realistically
       const speed = windSpeed !== undefined ? windSpeed : 10;
-      const rotationSpeed = speed * 0.0005;
-      ref.current.rotation.y -= delta * Math.min(rotationSpeed, 0.05); // cap max rotation for sanity
+      const rotationSpeed = speed *   0.00008;
+      ref.current.rotation.y -= delta * Math.min(rotationSpeed, 0.02); // cap max rotation for sanity
     }
   });
   return <group ref={ref}>{children}</group>;
@@ -284,34 +284,34 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
       <Clouds material={THREE.MeshLambertMaterial} limit={2000}>
         {isClear && (
           <>
-             <Cloud position={[5, 10, -20]} bounds={[15, 2, 10]} volume={5} color={finalCloudColor} speed={0.1} opacity={0.15} />
-             <Cloud position={[-10, 12, -15]} bounds={[10, 1.5, 8]} volume={3} color={finalCloudColor} speed={0.15} opacity={0.1} />
+             <Cloud position={[5, 10, -20]} bounds={[15, 2, 10]} volume={5} color={finalCloudColor} speed={0.02} opacity={0.15} />
+             <Cloud position={[-10, 12, -15]} bounds={[10, 1.5, 8]} volume={3} color={finalCloudColor} speed={0.03} opacity={0.1} />
           </>
         )}
 
         {isPartlyCloudy && (
           <>
-            <Cloud position={[-6, 6, -15]} bounds={[10, 5, 10]} volume={10} color={finalCloudColor} speed={0.2} opacity={0.6} />
-            <Cloud position={[6, 8, -20]} bounds={[10, 4, 10]} volume={10} color={finalCloudColor} speed={0.15} opacity={0.7} />
-            <Cloud position={[0, 10, -25]} bounds={[15, 6, 15]} volume={15} color={finalCloudColor} speed={0.1} opacity={0.5} />
+            <Cloud position={[-6, 6, -15]} bounds={[10, 5, 10]} volume={10} color={finalCloudColor} speed={0.04} opacity={0.6} />
+            <Cloud position={[6, 8, -20]} bounds={[10, 4, 10]} volume={10} color={finalCloudColor} speed={0.03} opacity={0.7} />
+            <Cloud position={[0, 10, -25]} bounds={[15, 6, 15]} volume={15} color={finalCloudColor} speed={0.02} opacity={0.5} />
           </>
         )}
 
         {(hasClouds && !isPartlyCloudy && !isClear) && (
           <>
-            <Cloud position={[0, 8, -10]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.5 : 0.2} opacity={0.8} />
-            <Cloud position={[-15, 10, -20]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.6 : 0.25} opacity={isFog ? 0.3 : 0.85} />
-            <Cloud position={[15, 10, -15]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.4 : 0.15} opacity={isFog ? 0.2 : 0.8} />
-            <Cloud position={[0, 12, -30]} bounds={[30, 10, 30]} volume={30} color={finalCloudColor} speed={isHeavyRain ? 0.3 : 0.1} opacity={0.9} />
+            <Cloud position={[0, 8, -10]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.1 : 0.04} opacity={0.8} />
+            <Cloud position={[-15, 10, -20]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.12 : 0.05} opacity={isFog ? 0.3 : 0.85} />
+            <Cloud position={[15, 10, -15]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.03} opacity={isFog ? 0.2 : 0.8} />
+            <Cloud position={[0, 12, -30]} bounds={[30, 10, 30]} volume={30} color={finalCloudColor} speed={isHeavyRain ? 0.06 : 0.02} opacity={0.9} />
             
-            <Cloud position={[20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.4 : 0.1} opacity={0.8} />
-            <Cloud position={[-20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.4 : 0.1} opacity={0.8} />
-            <Cloud position={[0, 12, 15]} bounds={[30, 8, 30]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.4 : 0.1} opacity={0.8} />
+            <Cloud position={[20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
+            <Cloud position={[-20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
+            <Cloud position={[0, 12, 15]} bounds={[30, 8, 30]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
             
             {isHeavyRain && (
               <>
-                <Cloud position={[5, 14, -5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.5} opacity={0.95} />
-                <Cloud position={[-10, 16, 5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.45} opacity={0.95} />
+                <Cloud position={[5, 14, -5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.1} opacity={0.95} />
+                <Cloud position={[-10, 16, 5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.09} opacity={0.95} />
               </>
             )}
           </>
