@@ -1,12 +1,14 @@
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
-export default function ScreenDrops({ wmoCode }: { wmoCode: number }) {
+export default function ScreenDrops({ wmoCode, rainRate }: { wmoCode: number, rainRate?: number }) {
   const isDrizzle = wmoCode >= 51 && wmoCode <= 57;
   const isRain = (wmoCode >= 61 && wmoCode <= 64) || (wmoCode >= 80 && wmoCode <= 81);
   const isHeavyRain = (wmoCode >= 65 && wmoCode <= 67) || (wmoCode >= 82 && wmoCode <= 83) || wmoCode >= 95;
   
-  const isActive = isDrizzle || isRain || isHeavyRain;
+  // Active if live rain rate exists or fallback WMO says it's raining
+  const isActive = (rainRate !== undefined && rainRate > 0) || isDrizzle || isRain || isHeavyRain;
+  
   const [drops, setDrops] = useState<{id: number, left: number, top: number, scale: number, duration: number}[]>([]);
 
   useEffect(() => {
@@ -16,8 +18,26 @@ export default function ScreenDrops({ wmoCode }: { wmoCode: number }) {
     }
     
     let count = 0;
-    // Faster spawning for heavy rain
-    const intervalTime = isHeavyRain ? 60 : isRain ? 150 : 400;
+    
+    // Scale density by physically measured live rain rate if possible!
+    let intervalTime = 400;
+    let maxDrops = 10;
+    
+    if (rainRate !== undefined && rainRate > 0) {
+        if (rainRate > 8) {
+            intervalTime = 60; // Heavy
+            maxDrops = 60;
+        } else if (rainRate > 2) {
+            intervalTime = 150; // Moderate
+            maxDrops = 30;
+        } else {
+            intervalTime = 400; // Light
+            maxDrops = 10;
+        }
+    } else {
+        intervalTime = isHeavyRain ? 60 : isRain ? 150 : 400;
+        maxDrops = isHeavyRain ? 60 : isRain ? 30 : 10;
+    }
     
     const interval = setInterval(() => {
       setDrops(current => {
@@ -29,7 +49,6 @@ export default function ScreenDrops({ wmoCode }: { wmoCode: number }) {
           duration: Math.random() * 1.5 + 0.8,
         };
         // prune old drops to prevent memory leaks
-        const maxDrops = isHeavyRain ? 60 : isRain ? 30 : 10;
         const updated = [...current, newDrop];
         if (updated.length > maxDrops) return updated.slice(updated.length - maxDrops);
         return updated;
@@ -37,7 +56,7 @@ export default function ScreenDrops({ wmoCode }: { wmoCode: number }) {
     }, intervalTime);
     
     return () => clearInterval(interval);
-  }, [isActive, isHeavyRain, isRain]);
+  }, [isActive, isHeavyRain, isRain, rainRate]);
 
   if (!isActive) return null;
 

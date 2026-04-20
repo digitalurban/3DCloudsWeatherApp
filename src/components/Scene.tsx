@@ -56,8 +56,14 @@ function Snow() {
   );
 }
 
-function Rain({ heavy, drizzle }: { heavy?: boolean; drizzle?: boolean }) {
+function Rain({ heavy, drizzle, windSpeed = 0 }: { heavy?: boolean; drizzle?: boolean, windSpeed?: number }) {
   const dropCount = drizzle ? 1000 : heavy ? 15000 : 5000;
+  
+  // Calculate a wind multiplier. Cap it so the rain doesn't travel horizontally too crazily.
+  // Assuming a max reasonable visual wind speed scalar around 30mph -> 30/10 = 3x multiplier
+  const safeWind = Math.min(Math.max(windSpeed, 0), 40);
+  const windTiltModifier = (safeWind / 10) || 1;
+
   const positions = useMemo(() => {
     const p = new Float32Array(dropCount * 6); // 2 vertices per line (x,y,z, x,y,z)
     for (let i = 0; i < dropCount; i++) {
@@ -66,7 +72,8 @@ function Rain({ heavy, drizzle }: { heavy?: boolean; drizzle?: boolean }) {
         const z = (Math.random() - 0.5) * 80;
         
         const length = heavy ? 1.0 : drizzle ? 0.3 : 0.6;
-        const windTilt = heavy ? 0.4 : drizzle ? 0.05 : 0.2;
+        const baseWindTilt = heavy ? 0.4 : drizzle ? 0.05 : 0.2;
+        const windTilt = baseWindTilt * windTiltModifier;
 
         p[i * 6] = x;
         p[i * 6 + 1] = y;
@@ -77,7 +84,7 @@ function Rain({ heavy, drizzle }: { heavy?: boolean; drizzle?: boolean }) {
         p[i * 6 + 5] = z;
     }
     return p;
-  }, [dropCount, heavy, drizzle]);
+  }, [dropCount, heavy, drizzle, windTiltModifier]);
 
   const ref = useRef<THREE.LineSegments>(null);
   useFrame((state, delta) => {
@@ -87,7 +94,9 @@ function Rain({ heavy, drizzle }: { heavy?: boolean; drizzle?: boolean }) {
     for (let i = 0; i < dropCount; i++) {
       const speedBase = heavy ? 45 : drizzle ? 10 : 25;
       const speed = (speedBase + (i % 10)) * delta;
-      const wind = (heavy ? 15 : drizzle ? 2 : 5) * delta;
+      
+      const baseWind = (heavy ? 15 : drizzle ? 2 : 5) * delta;
+      const wind = baseWind * windTiltModifier;
 
       // move top vertex
       array[i * 6 + 1] -= speed;
@@ -99,10 +108,11 @@ function Rain({ heavy, drizzle }: { heavy?: boolean; drizzle?: boolean }) {
       
       if (array[i * 6 + 4] < -2) {
         const newY = 25 + Math.random() * 10;
-        const newX = (Math.random() - 0.5) * 80;
+        const newX = (Math.random() - 0.5) * 80 + (20 * Math.random()); // spawn further back on x depending on wind
         
         const length = heavy ? 1.0 : drizzle ? 0.3 : 0.6;
-        const windTilt = heavy ? 0.4 : drizzle ? 0.05 : 0.2;
+        const baseWindTilt = heavy ? 0.4 : drizzle ? 0.05 : 0.2;
+        const windTilt = baseWindTilt * windTiltModifier;
 
         array[i * 6] = newX;
         array[i * 6 + 1] = newY;
@@ -143,7 +153,7 @@ function CloudDrifter({ children, windSpeed }: { children: React.ReactNode, wind
   return <group ref={ref}>{children}</group>;
 }
 
-export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, windSpeedMph }: { wmoCode: number, currentTime?: number, sunriseTime?: number, sunsetTime?: number, windSpeedMph?: number }) {
+export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, windSpeedMph, solarRadiation, rainRate }: { wmoCode: number, currentTime?: number, sunriseTime?: number, sunsetTime?: number, windSpeedMph?: number, solarRadiation?: number, rainRate?: number }) {
   let isClear = wmoCode === 0 || wmoCode === 1;
   let isPartlyCloudy = wmoCode === 2;
   let isCloudy = wmoCode === 3;
@@ -153,6 +163,19 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   let isHeavyRain = (wmoCode >= 65 && wmoCode <= 67) || (wmoCode >= 82 && wmoCode <= 83) || wmoCode >= 95;
   let isSnow = (wmoCode >= 71 && wmoCode <= 77) || (wmoCode >= 85 && wmoCode <= 86);
   let isStorm = wmoCode >= 95;
+
+  // Use local station rain rate to override WMO codes if there is an active local rain event
+  if (rainRate !== undefined && rainRate > 0) {
+      isClear = false;
+      isPartlyCloudy = false;
+      isRain = true; // force rendering of rain mesh
+      if (rainRate > 8) {
+          isHeavyRain = true;
+          isDrizzle = false;
+      } else if (rainRate < 2.5 && !isHeavyRain) {
+          isDrizzle = true;
+      }
+  }
 
   let hasClouds = isCloudy || isPartlyCloudy || isDrizzle || isRain || isHeavyRain || isSnow || isStorm || isFog;
 
@@ -225,6 +248,15 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   } else {
       skyParams.turbidity = 0.2;
       skyParams.rayleigh = 0.1;
+  }
+  
+  // Real-time Solar Radiation Integration
+  // A bright sunny day is typically 800-1000 W/m², overcast drops down to 100-300
+  if (isDay && solarRadiation !== undefined) {
+      // Create a sensible scalar bounded from 0.2 to 1.5 (20% to 150% brightness)
+      const radScalar = Math.max(0.2, Math.min(1.5, solarRadiation / 800));
+      // Only blend it in so we don't totally crush the WMO code baseline
+      baseWorldLight = (baseWorldLight * 0.4) + (radScalar * 0.6);
   }
 
   // Apply Time Modifiers
@@ -312,7 +344,7 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           {cloudElements}
         </CloudDrifter>
 
-        {(isRain || isHeavyRain || isDrizzle) && <Rain heavy={isHeavyRain} drizzle={isDrizzle} />}
+        {(isRain || isHeavyRain || isDrizzle) && <Rain heavy={isHeavyRain} drizzle={isDrizzle} windSpeed={windSpeedMph} />}
         {isSnow && <Snow />}
 
         <OrbitControls 

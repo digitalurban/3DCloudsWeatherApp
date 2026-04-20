@@ -77,11 +77,16 @@ export default function App() {
            sunriseTime={weatherData?.daily?.sunrise?.[0] ? new Date(weatherData.daily.sunrise[0]).getTime() : undefined}
            sunsetTime={weatherData?.daily?.sunset?.[0] ? new Date(weatherData.daily.sunset[0]).getTime() : undefined}
            windSpeedMph={mqttData ? parseFloat(mqttData.windSpeed_mph) : weatherData?.current?.wind_speed_10m}
+           solarRadiation={mqttData?.radiation_Wpm2 ? parseFloat(mqttData.radiation_Wpm2) : undefined}
+           rainRate={mqttData?.rainRate_mm_per_hour ? parseFloat(mqttData.rainRate_mm_per_hour) : undefined}
          />
       </div>
 
       {/* Screen Rain Splashes */}
-      <ScreenDrops wmoCode={weatherData?.current?.weather_code ?? 0} />
+      <ScreenDrops 
+        wmoCode={weatherData?.current?.weather_code ?? 0} 
+        rainRate={mqttData?.rainRate_mm_per_hour ? parseFloat(mqttData.rainRate_mm_per_hour) : undefined} 
+      />
 
       {/* UI Overlay - Using flex col to push Dashboard to bottom, add pt- safe area for iOS notch */}
       <div className="absolute inset-0 z-10 flex flex-col justify-between p-2 lg:p-6 pointer-events-none pt-[env(safe-area-inset-top,8px)]">

@@ -48,11 +48,18 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   const tempVal = mqttData?.outTemp_C ? parseFloat(mqttData.outTemp_C).toFixed(1) 
       : realData ? realData.current.temperature_2m : '--';
   
+  // Use THSW index (Temperature, Humidity, Sun, Wind) for the feels like if available, fallback to windchill, fallback to high/low
+  const feelsLike = mqttData?.THSW_C ? Math.round(parseFloat(mqttData.THSW_C)) 
+      : mqttData?.windchill_C ? Math.round(parseFloat(mqttData.windchill_C)) : undefined;
+      
   const tempMax = realData?.daily?.temperature_2m_max?.[0];
   const tempMin = realData?.daily?.temperature_2m_min?.[0];
-  const tempSub = (tempMax !== undefined && tempMin !== undefined) 
-    ? `H:${Math.round(tempMax)}° L:${Math.round(tempMin)}°` 
-    : 'Actual Temp';
+  
+  const tempSub = feelsLike !== undefined 
+      ? `Feels ${feelsLike}°` 
+      : (tempMax !== undefined && tempMin !== undefined) 
+        ? `H:${Math.round(tempMax)}° L:${Math.round(tempMin)}°` 
+        : 'Actual Temp';
 
   // Precipitation (Today's forecast vs current live rate)
   const precipDay = realData?.daily?.precipitation_sum?.[0];
@@ -65,7 +72,8 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   const windVal = mqttData?.windSpeed_mph ? mqttData.windSpeed_mph 
       : realData ? Math.round(realData.current.wind_speed_10m) : '--';
       
-  const windDir = mqttData?.windDir ? `DIR ${mqttData.windDir}°` 
+  const gustStr = mqttData?.windGust10 && parseFloat(mqttData.windGust10) > 0 ? ` • Gust ${Math.round(parseFloat(mqttData.windGust10))}` : '';
+  const windDir = mqttData?.windDir ? `DIR ${Math.round(parseFloat(mqttData.windDir))}°${gustStr}` 
       : 'API Winds';
 
   const humidityVal = mqttData?.outHumidity ? Math.round(parseFloat(mqttData.outHumidity)) 
