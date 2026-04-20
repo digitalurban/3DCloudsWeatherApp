@@ -56,7 +56,6 @@ export default function App() {
         try {
            const parsed = JSON.parse(event.data);
            setMqttData(parsed);
-           setLastUpdateTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         } catch(e) {}
      };
      
@@ -101,30 +100,29 @@ export default function App() {
                 <MapPin size={10} />
                 <span>Downham Market, Fincham</span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-400 text-[7px] lg:text-xs font-sans uppercase tracking-widest">
+              <div className="flex items-center gap-1 text-white/80 text-[6px] lg:text-[9px] font-sans uppercase tracking-widest mt-0.5">
                 <Clock size={8} />
-                <span>{mqttData ? 'MQTT Connected (Live Loop Data)' : 'Fetching API Fallback...'}</span>
+                <span>{mqttData ? 'MQTT Connected (Live)' : 'Fetching API Fallback...'}</span>
               </div>
             </div>
           </div>
           
           <div className="flex flex-col items-end gap-1">
-            <div className="backdrop-blur-xl bg-black/60 p-1 lg:p-3 shadow-2xl text-right shrink-0 border-r-4 border-white">
+            <div className="backdrop-blur-xl bg-black/60 p-1 lg:p-3 shadow-2xl text-right shrink-0 border-r-4 border-white flex flex-col items-end">
                  <span className="block text-[7px] lg:text-[10px] font-sans uppercase tracking-[0.2em] text-white/60 mb-0.5">Live Weather</span>
                  <span className="block text-[10px] lg:text-base font-serif italic whitespace-nowrap">{liveDesc}</span>
                  {lastUpdateTime && (
-                   <span className="block text-[6px] lg:text-[9px] font-sans uppercase tracking-widest text-emerald-400 mt-1 opacity-80 relative overflow-hidden h-[1.2em]">
+                   <span className="block text-[6px] lg:text-[9px] font-sans uppercase tracking-widest text-slate-300 mt-1 opacity-80 h-[1.2em] overflow-hidden whitespace-nowrap">
                      <AnimatePresence mode="popLayout">
-                       <motion.span
+                       <motion.div
                          key={lastUpdateTime}
                          initial={{ opacity: 0, y: 5 }}
                          animate={{ opacity: 1, y: 0 }}
                          exit={{ opacity: 0, y: -5 }}
                          transition={{ duration: 0.3 }}
-                         className="absolute right-0"
                        >
-                         Updated: {lastUpdateTime}
-                       </motion.span>
+                         API Updated: {lastUpdateTime}
+                       </motion.div>
                      </AnimatePresence>
                    </span>
                  )}

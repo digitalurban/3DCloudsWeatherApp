@@ -31,7 +31,7 @@ const CompassRose = ({ degree }: { degree: number | undefined }) => {
              <motion.div 
                animate={{ rotate: rotation }}
                transition={{ type: "spring", stiffness: 40, damping: 15 }}
-               className="text-emerald-400 z-10"
+               className="text-white z-10"
              >
                 <Navigation className="w-3 h-3 lg:w-4 lg:h-4" fill="currentColor" />
              </motion.div>
@@ -58,7 +58,7 @@ const Card = ({ title, icon: Icon, value, unit, sub, rightElement }: { title: st
   <div className="backdrop-blur-xl bg-black/60 border border-white/20 p-2 md:p-3 lg:p-4 flex flex-col text-white shadow-2xl transition-all duration-300 hover:bg-black/80 flex-[0_0_auto] md:flex-1 min-w-[90px] md:min-w-0 snap-start">
     <div className="flex items-center justify-between mb-1 lg:mb-2 pb-1 border-b border-white/20">
       <span className="text-[8px] md:text-[10px] lg:text-[11px] font-sans uppercase tracking-[0.1em] lg:tracking-[0.2em] line-clamp-1 truncate mr-1">{title}</span>
-      <Icon size={12} className="text-[#10b981] opacity-90 shrink-0 lg:w-3.5 lg:h-3.5" />
+      <Icon size={12} className="text-white opacity-80 shrink-0 lg:w-3.5 lg:h-3.5" />
     </div>
     <div className="flex items-center">
         <div className="text-xs md:text-base lg:text-xl font-serif tracking-tight truncate flex items-baseline relative min-h-[1.2rem] gap-[0.2em]">
