@@ -3,6 +3,7 @@ import Scene from './components/Scene';
 import WeatherDashboard, { getWmoDescription } from './components/WeatherDashboard';
 import ScreenDrops from './components/ScreenDrops';
 import { MapPin, Clock, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [weatherCondition, setWeatherCondition] = useState('clear');
@@ -110,6 +111,11 @@ export default function App() {
             <div className="backdrop-blur-xl bg-black/60 p-1 lg:p-3 shadow-2xl text-right shrink-0 border-r-4 border-white">
                  <span className="block text-[7px] lg:text-[10px] font-sans uppercase tracking-[0.2em] text-white/60 mb-0.5">Live Weather</span>
                  <span className="block text-[10px] lg:text-base font-serif italic whitespace-nowrap">{liveDesc}</span>
+                 {lastUpdateTime && (
+                   <span className="block text-[6px] lg:text-[9px] font-sans uppercase tracking-widest text-[#a0aec0] mt-1 opacity-60">
+                     API Updated: {lastUpdateTime}
+                   </span>
+                 )}
             </div>
             <div className="hidden md:block text-[8px] lg:text-xs font-sans uppercase tracking-widest bg-black/60 backdrop-blur-xl px-2 py-1 lg:px-3 lg:py-1.5 border border-white/20 text-white select-none">
               Drag & Pinch to explore

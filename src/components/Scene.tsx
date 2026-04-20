@@ -344,6 +344,31 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           {cloudElements}
         </CloudDrifter>
 
+        {/* Physical Sun Representation - only visible if skies are clear/partly cloudy */}
+        {(isDay && (isClear || isPartlyCloudy)) && (
+          <group position={[-100, Math.max(10, sunY), 100]}>
+             {/* Core */}
+             <mesh>
+               <sphereGeometry args={[4, 32, 32]} />
+               <meshBasicMaterial color={isDuskDawn ? "#ffaa33" : "#ffffff"} />
+             </mesh>
+             {/* Dynamic Solar Radiation Halo */}
+             <mesh>
+               <sphereGeometry args={[
+                 solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10, 
+                 32, 32
+               ]} />
+               <meshBasicMaterial 
+                  color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
+                  transparent 
+                  opacity={isDuskDawn ? 0.4 : 0.15} 
+                  blending={THREE.AdditiveBlending} 
+                  depthWrite={false}
+               />
+             </mesh>
+          </group>
+        )}
+
         {(isRain || isHeavyRain || isDrizzle) && <Rain heavy={isHeavyRain} drizzle={isDrizzle} windSpeed={windSpeedMph} />}
         {isSnow && <Snow />}
 
