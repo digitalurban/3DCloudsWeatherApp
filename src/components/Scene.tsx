@@ -2,7 +2,6 @@ import React, { useRef, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Sky, Clouds, Cloud, OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { useSpring, animated } from '@react-spring/three';
 
 function Snow() {
   const flakeCount = 6000;
@@ -157,29 +156,52 @@ function CloudDrifter({ children, windSpeed }: { children: React.ReactNode, wind
 function SmoothLighting({ 
   ambIntensity, 
   dirIntensity, 
+  sunX, 
   sunY, 
+  sunZ,
   finalDirLightColor,
   isDay
 }: { 
   ambIntensity: number, 
   dirIntensity: number, 
+  sunX: number, 
   sunY: number, 
+  sunZ: number,
   finalDirLightColor: string,
   isDay: boolean 
 }) {
-  const springs = useSpring({
-      ambInt: ambIntensity,
-      dirInt: dirIntensity,
-      sunTopPos: Math.max(10, sunY),
-      config: { mass: 1, tension: 30, friction: 15 } // Very smooth, slow fade, no bounce
+  const ambRef = useRef<THREE.AmbientLight>(null);
+  const dirRef = useRef<THREE.DirectionalLight>(null);
+  const initRef = useRef(false);
+
+  useFrame((state, delta) => {
+    // Smoother, slower lerp factor for gentle lighting shifts (e.g. 0.5 * delta)
+    const factor = 1.0 * delta;
+    
+    if (ambRef.current) {
+        if (!initRef.current) ambRef.current.intensity = ambIntensity;
+        else ambRef.current.intensity = THREE.MathUtils.lerp(ambRef.current.intensity, ambIntensity, factor);
+    }
+    
+    if (dirRef.current) {
+        const targetPos = new THREE.Vector3(sunX, Math.max(10, sunY), sunZ);
+        if (!initRef.current) {
+            dirRef.current.intensity = dirIntensity;
+            dirRef.current.position.copy(targetPos);
+        } else {
+            dirRef.current.intensity = THREE.MathUtils.lerp(dirRef.current.intensity, dirIntensity, factor);
+            dirRef.current.position.lerp(targetPos, factor);
+        }
+    }
+    
+    initRef.current = true;
   });
 
   return (
     <>
-      <animated.ambientLight intensity={springs.ambInt} />
-      <animated.directionalLight 
-        position={springs.sunTopPos.to(y => [-100, y, 100]) as any} 
-        intensity={springs.dirInt} 
+      <ambientLight ref={ambRef} />
+      <directionalLight 
+        ref={dirRef}
         color={finalDirLightColor} 
       />
       <directionalLight position={[10, 10, -10]} intensity={isDay ? 0.3 : 0.05} color={finalDirLightColor} />
@@ -187,23 +209,71 @@ function SmoothLighting({
   );
 }
 
-function AnimatedHalo({ targetRadius, isDuskDawn }: { targetRadius: number, isDuskDawn: boolean }) {
-  const { radius } = useSpring({
-      radius: targetRadius,
-      config: { mass: 1, tension: 40, friction: 15 }
+function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }: { sunX: number, sunY: number, sunZ: number, solarRadiation?: number, isDuskDawn: boolean, hasClouds: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const coreMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const haloMeshRef = useRef<THREE.Mesh>(null);
+  const initRef = useRef(false);
+
+  useFrame((state, delta) => {
+      // Very smooth slow transition when weather updates
+      const factor = 1.0 * delta;
+      
+      const targetPos = new THREE.Vector3(sunX, Math.max(10, sunY), sunZ);
+      const targetHaloRadius = solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10;
+      const targetOpacityMod = hasClouds ? 0.05 : 1.0;
+      
+      if (groupRef.current) {
+          if (!initRef.current) groupRef.current.position.copy(targetPos);
+          else groupRef.current.position.lerp(targetPos, factor);
+      }
+      
+      if (coreMatRef.current) {
+          if (!initRef.current) coreMatRef.current.opacity = targetOpacityMod;
+          else coreMatRef.current.opacity = THREE.MathUtils.lerp(coreMatRef.current.opacity, targetOpacityMod, factor);
+      }
+      
+      if (haloMatRef.current) {
+          const baseHaloOpac = isDuskDawn ? 0.4 : 0.15;
+          const targetOpac = baseHaloOpac * targetOpacityMod;
+          if (!initRef.current) haloMatRef.current.opacity = targetOpac;
+          else haloMatRef.current.opacity = THREE.MathUtils.lerp(haloMatRef.current.opacity, targetOpac, factor);
+      }
+      
+      if (haloMeshRef.current) {
+          const scaleTarget = targetHaloRadius / 10;
+          const targetScaleVec = new THREE.Vector3(scaleTarget, scaleTarget, scaleTarget);
+          if (!initRef.current) haloMeshRef.current.scale.copy(targetScaleVec);
+          else haloMeshRef.current.scale.lerp(targetScaleVec, factor);
+      }
+      
+      initRef.current = true;
   });
 
   return (
-    <animated.mesh scale={radius.to(r => [r/10, r/10, r/10])}>
-      <sphereGeometry args={[10, 32, 32]} />
-      <meshBasicMaterial 
-         color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
-         transparent 
-         opacity={isDuskDawn ? 0.4 : 0.15} 
-         blending={THREE.AdditiveBlending} 
-         depthWrite={false}
-      />
-    </animated.mesh>
+    <group ref={groupRef}>
+       {/* Core */}
+       <mesh>
+         <sphereGeometry args={[4, 32, 32]} />
+         <meshBasicMaterial 
+            ref={coreMatRef}
+            color={isDuskDawn ? "#ffaa33" : "#ffffff"} 
+            transparent
+         />
+       </mesh>
+       {/* Dynamic Solar Radiation Halo */}
+       <mesh ref={haloMeshRef}>
+         <sphereGeometry args={[10, 32, 32]} />
+         <meshBasicMaterial 
+            ref={haloMatRef}
+            color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
+            transparent 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false}
+         />
+       </mesh>
+    </group>
   );
 }
 
@@ -236,7 +306,7 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   // Day/Night and Sun Positioning
   let sunY = 20;
   let sunX = 100;
-  let sunZ = 100;
+  let sunZ = -100;
   
   let isDay = true;
   let isDuskDawn = false;
@@ -388,7 +458,9 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
         <SmoothLighting 
           ambIntensity={ambIntensity} 
           dirIntensity={dirIntensity} 
+          sunX={sunX}
           sunY={Math.max(10, sunY)} 
+          sunZ={sunZ}
           finalDirLightColor={finalDirLightColor} 
           isDay={isDay} 
         />
@@ -398,20 +470,16 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           {cloudElements}
         </CloudDrifter>
 
-        {/* Physical Sun Representation - only visible if skies are clear/partly cloudy */}
-        {(isDay && (isClear || isPartlyCloudy)) && (
-          <group position={[-100, Math.max(10, sunY), 100]}>
-             {/* Core */}
-             <mesh>
-               <sphereGeometry args={[4, 32, 32]} />
-               <meshBasicMaterial color={isDuskDawn ? "#ffaa33" : "#ffffff"} />
-             </mesh>
-             {/* Dynamic Solar Radiation Halo */}
-             <AnimatedHalo 
-                targetRadius={solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10} 
-                isDuskDawn={isDuskDawn}
-             />
-          </group>
+        {/* Physical Sun Representation - visible during the day, even if overcast. Fades behind clouds via opacityMod. */}
+        {isDay && (
+          <AnimatedSun 
+            sunX={sunX} 
+            sunY={sunY} 
+            sunZ={sunZ} 
+            solarRadiation={solarRadiation} 
+            isDuskDawn={isDuskDawn} 
+            hasClouds={hasClouds && !isPartlyCloudy}
+          />
         )}
 
         {(isRain || isHeavyRain || isDrizzle) && <Rain heavy={isHeavyRain} drizzle={isDrizzle} windSpeed={windSpeedMph} />}

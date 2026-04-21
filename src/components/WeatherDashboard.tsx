@@ -141,6 +141,18 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   const uvVal = mqttData?.UV ? parseFloat(mqttData.UV).toFixed(1) 
       : realData && realData.daily ? Math.round(realData.daily.uv_index_max[0]) : '--';
       
+  const radiationVal = mqttData?.radiation_Wpm2 ? parseFloat(mqttData.radiation_Wpm2) : undefined;
+  
+  let lightRightElement = undefined;
+  if (radiationVal !== undefined) {
+      lightRightElement = (
+          <div className="flex items-baseline pl-2 border-l border-white/20 ml-1 h-full text-xs md:text-sm lg:text-lg font-serif">
+              <span>{Math.round(radiationVal)}</span>
+              <span className="inline-block ml-1">W/m²</span>
+          </div>
+      )
+  }
+      
   const cloudbaseVal = mqttData?.cloudbase_meter ? Math.round(parseFloat(mqttData.cloudbase_meter)) 
       : realData ? (realData.current.visibility / 1000).toFixed(1) : '--';
       
@@ -290,7 +302,7 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
         <Card title="Precipitation" icon={Droplets} value={precipVal} unit=" mm" sub={rainSub} />
         <Card title="Wind" icon={Wind} value={windVal} unit=" mph" sub={windDir} rightElement={<CompassRose degree={windDirDegree} />} />
         <Card title="Humidity" icon={CloudIcon} value={humidityVal} unit="%" sub="Relative" />
-        <Card title="UV Index" icon={SunDim} value={uvVal} sub="Live" />
+        <Card title="Light" icon={SunDim} value={uvVal} sub="UV" rightElement={lightRightElement} />
         <Card title={mqttData ? "Cloudbase" : "Visibility"} icon={Eye} value={cloudbaseVal} unit={mqttData ? " m" : " km"} sub="Above ground" />
         <Card title="Pressure" icon={Gauge} value={pressureVal} unit=" hPa" sub={baroSub} rightElement={baroRightElement} />
         <Card title="Sun" icon={Sunrise} value={sunStr} sub="Rise • Set" />

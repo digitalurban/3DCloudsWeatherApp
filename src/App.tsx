@@ -126,9 +126,9 @@ export default function App() {
                      </AnimatePresence>
                    </span>
                  )}
-            </div>
-            <div className="hidden md:block text-[6px] lg:text-[8px] font-sans uppercase tracking-widest bg-black/60 backdrop-blur-xl px-1.5 py-0.5 lg:px-2 lg:py-1 border border-white/20 text-white/70 select-none">
-              Drag & Pinch to explore
+                 <div className="hidden md:block text-[5px] lg:text-[7px] font-sans uppercase tracking-[0.3em] text-white/40 mt-1.5 pt-1.5 border-t border-white/10 select-none">
+                   Drag & Pinch to explore
+                 </div>
             </div>
           </div>
         </header>
