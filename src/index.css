@@ -5,3 +5,7 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", ui-serif, Georgia, serif;
 }
+
+html, body {
+  background-color: #000000; /* Prevent white bars on iOS overscroll/safe-areas */
+}

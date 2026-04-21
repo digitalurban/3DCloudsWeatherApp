@@ -184,7 +184,7 @@ function SmoothLighting({
     }
     
     if (dirRef.current) {
-        const targetPos = new THREE.Vector3(sunX, Math.max(10, sunY), sunZ);
+        const targetPos = new THREE.Vector3(sunX, sunY, sunZ);
         if (!initRef.current) {
             dirRef.current.intensity = dirIntensity;
             dirRef.current.position.copy(targetPos);
@@ -220,7 +220,7 @@ function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }
       // Very smooth slow transition when weather updates
       const factor = 1.0 * delta;
       
-      const targetPos = new THREE.Vector3(sunX, Math.max(10, sunY), sunZ);
+      const targetPos = new THREE.Vector3(sunX, sunY, sunZ);
       const targetHaloRadius = solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10;
       const targetOpacityMod = hasClouds ? 0.05 : 1.0;
       
@@ -305,8 +305,8 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
   // Day/Night and Sun Positioning
   let sunY = 20;
-  let sunX = 100;
-  let sunZ = -100;
+  let sunX = 80;
+  let sunZ = -120;
   
   let isDay = true;
   let isDuskDawn = false;
@@ -317,8 +317,8 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           const dayLength = sunsetTime - sunriseTime;
           const progress = (currentTime - sunriseTime) / dayLength; // 0.0 to 1.0 throughout the day
           const angle = Math.PI * progress; 
-          sunX = 100 * Math.cos(angle);
-          sunY = Math.max(-10, 100 * Math.sin(angle));
+          sunX = 80 * Math.cos(angle);
+          sunY = Math.max(-10, 40 * Math.sin(angle));
           
           if (sunY > 0 && sunY < 20) {
               isDuskDawn = true;

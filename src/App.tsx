@@ -11,12 +11,25 @@ export default function App() {
   const [mqttData, setMqttData] = useState<any>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState('');
   const [sceneTime, setSceneTime] = useState(() => new Date().getTime());
+  
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
 
   // 1. Fetch OpenMeteo Data
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        if (initialLoading) {
+            setInitError("Network timeout. The atmosphere API is taking too long to respond.");
+            setInitialLoading(false);
+        }
+    }, 15000);
+
     const fetchWeather = async () => {
       try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,precipitation_probability_max&wind_speed_unit=mph&timezone=Europe%2FLondon');
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,precipitation_probability_max&wind_speed_unit=mph&timezone=Europe%2FLondon', { signal: controller.signal });
+        
+        if (!res.ok) throw new Error("API returned an error code.");
         const data = await res.json();
         
         setWeatherData(data);
@@ -36,8 +49,16 @@ export default function App() {
         else if (code >= 95) cond = 'storm';
         
         setWeatherCondition(cond);
-      } catch(err) {
-        console.error("Failed to fetch weather", err);
+        setInitialLoading(false);
+        setInitError(null);
+      } catch(err: any) {
+        if (err.name !== 'AbortError') {
+            console.error("Failed to fetch weather", err);
+            if (!weatherData) {
+                setInitError(err.message || "Failed to load atmospheric conditions.");
+                setInitialLoading(false);
+            }
+        }
       }
     };
     
@@ -45,7 +66,11 @@ export default function App() {
     
     // Auto update every 15 mins (15 * 60 * 1000 ms)
     const interval = setInterval(fetchWeather, 900000);
-    return () => clearInterval(interval);
+    return () => {
+        clearInterval(interval);
+        controller.abort();
+        clearTimeout(timeoutId);
+    };
   }, []);
 
   // 2. Open Server-Sent Events stream for MQTT Loop
@@ -67,6 +92,35 @@ export default function App() {
   }, []);
   
   const liveDesc = weatherData ? getWmoDescription(weatherData.current.weather_code) : 'Loading...';
+
+  if (initialLoading) {
+     return (
+       <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
+           <Loader2 className="w-8 h-8 md:w-12 md:h-12 animate-spin text-white/30" />
+           <motion.span 
+             initial={{ opacity: 0, y: 10 }}
+             animate={{ opacity: 1, y: 0 }}
+             className="mt-6 text-xs md:text-sm font-sans uppercase tracking-[0.3em] text-white/60"
+           >
+              Gathering Conditions
+           </motion.span>
+       </div>
+     );
+  }
+  
+  if (initError && !weatherData) {
+     return (
+       <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-white z-50 p-6 text-center">
+           <div className="text-red-400 mb-4 border border-red-900/50 bg-red-950/20 p-4 shadow-xl">
+             <span className="block text-sm font-sans uppercase tracking-widest text-red-500 mb-2">Atmospheric Link Failed</span>
+             <span className="block font-serif text-lg">{initError}</span>
+           </div>
+           <button onClick={() => window.location.reload()} className="px-6 py-2 border border-white/20 uppercase tracking-widest text-xs hover:bg-white/10 transition-colors">
+              Restart Simulation
+           </button>
+       </div>
+     );
+  }
 
   return (
     <div className="relative w-[100dvw] h-[100dvh] overflow-hidden bg-sky-900 font-sans text-white overscroll-none" style={{ touchAction: 'none' }}>
@@ -90,7 +144,13 @@ export default function App() {
       />
 
       {/* UI Overlay - Using flex col to push Dashboard to bottom, add pt- safe area for iOS notch */}
-      <div className="absolute inset-0 z-10 flex flex-col justify-between p-2 lg:p-6 pointer-events-none pt-[env(safe-area-inset-top,8px)]">
+      <div 
+        className="absolute inset-0 z-10 flex flex-col justify-between p-2 lg:p-6 pointer-events-none"
+        style={{ 
+          paddingTop: 'calc(env(safe-area-inset-top, 8px) + 20px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)'
+        }}
+      >
         
         {/* Top Header */}
         <header className="pointer-events-auto flex flex-row items-start justify-between gap-1 w-full shrink-0">
