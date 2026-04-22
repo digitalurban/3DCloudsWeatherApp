@@ -153,6 +153,40 @@ function CloudDrifter({ children, windSpeed }: { children: React.ReactNode, wind
   return <group ref={ref}>{children}</group>;
 }
 
+function Lightning() {
+  const lightRef = useRef<THREE.PointLight>(null);
+  
+  useFrame((state, delta) => {
+    if (!lightRef.current) return;
+    
+    // 2% chance per frame to strike
+    if (Math.random() > 0.98) {
+       // Huge burst of energy
+       lightRef.current.intensity = Math.random() * 800 + 400; 
+       
+       // Move the flash randomly within the cloud ceiling layer
+       lightRef.current.position.set(
+           (Math.random() - 0.5) * 80,
+           15 + Math.random() * 10,
+           (Math.random() - 0.5) * 80
+       );
+    } else {
+       // Fast immediate decay simulating the pop of lightning
+       lightRef.current.intensity = THREE.MathUtils.lerp(lightRef.current.intensity, 0, 15 * delta);
+    }
+  });
+
+  return (
+    <pointLight 
+      ref={lightRef} 
+      color="#cce6ff" 
+      distance={200} 
+      decay={2} 
+      intensity={0} 
+    />
+  );
+}
+
 function SmoothLighting({ 
   ambIntensity, 
   dirIntensity, 
@@ -285,7 +319,117 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
   );
 }
 
+function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, sunY: number, sunZ: number, hasClouds: boolean, phase: number }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const shaderMatRef = useRef<THREE.ShaderMaterial>(null);
+  const initRef = useRef(false);
+
+  useFrame((state, delta) => {
+      const factor = 1.0 * delta;
+      
+      // Moon is roughly opposite the sun
+      const targetPos = new THREE.Vector3(-sunX, -sunY, -sunZ);
+      const targetOpacityMod = hasClouds ? 0.01 : 0.8; // Boost opacity as phase masks dim the output
+      
+      if (groupRef.current) {
+          if (!initRef.current) groupRef.current.position.copy(targetPos);
+          else groupRef.current.position.lerp(targetPos, factor);
+      }
+      
+      if (shaderMatRef.current) {
+          if (!initRef.current) shaderMatRef.current.uniforms.opacity.value = targetOpacityMod;
+          else shaderMatRef.current.uniforms.opacity.value = THREE.MathUtils.lerp(shaderMatRef.current.uniforms.opacity.value, targetOpacityMod, factor);
+      }
+      
+      initRef.current = true;
+  });
+
+  return (
+    <group ref={groupRef}>
+       <mesh>
+         <planeGeometry args={[20, 20]} />
+         <shaderMaterial 
+            ref={shaderMatRef}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            uniforms={{
+              color: { value: new THREE.Color('#e0e8ff') }, // Cool silver/blue moonlight
+              opacity: { value: 0.0 },
+              phase: { value: phase } // Pass real-time moon phase
+            }}
+            vertexShader={`
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+                mvPosition.xy += position.xy;
+                gl_Position = projectionMatrix * mvPosition;
+              }
+            `}
+            fragmentShader={`
+              uniform vec3 color;
+              uniform float opacity;
+              uniform float phase;
+              varying vec2 vUv;
+              void main() {
+                vec2 p = vUv * 2.0 - 1.0; 
+                float dist = length(p);
+                
+                // Base moon radius
+                float radius = 0.25; 
+                float moonMask = smoothstep(radius + 0.01, radius - 0.01, dist);
+                
+                // Calculate pseudo-3D normal for a sphere in 2D space
+                float z = sqrt(max(0.0, radius*radius - dist*dist));
+                vec3 normal = normalize(vec3(p.x, p.y, z));
+                
+                // Map the 0.0-1.0 phase to an angle around the sphere
+                // Phase 0.0 = New, 0.5 = Full, 1.0 = New
+                float theta = phase * 3.14159265 * 2.0;
+                vec3 lightDir = normalize(vec3(-sin(theta), 0.0, cos(theta)));
+                
+                // Compute Lambertian diffuse illumination for the terminator
+                float diffuse = dot(normal, lightDir);
+                
+                // Sharp terminator (realistic for no lunar atmosphere)
+                float lit = smoothstep(0.02, 0.1, diffuse) * moonMask;
+                
+                // Earthshine (extremely faint visibility of the shadowed side)
+                float earthshine = moonMask * 0.05;
+                float finalMoon = max(lit, earthshine);
+                
+                // Dynamic outer atmospheric bloom radiating outward
+                float glow = smoothstep(0.6, 0.0, dist) * 0.6;
+                // Dim the atmospheric bloom when it's a new moon
+                float phaseGlowScalar = max(0.1, (1.0 + cos(theta)) * 0.5); 
+                
+                float alpha = clamp(finalMoon + glow * phaseGlowScalar, 0.0, 1.0) * opacity;
+                
+                vec3 finalColor = mix(color, vec3(1.0), finalMoon * 0.4);
+                gl_FragColor = vec4(finalColor, alpha);
+              }
+            `}
+         />
+       </mesh>
+    </group>
+  );
+}
+
+// Calculate the precise lunar synodic phase (0.0 to 1.0)
+function getMoonPhase(timeMs: number): number {
+    // Known new moon epoch: Jan 6, 2000, 18:14 UTC
+    const knownNewMoon = new Date('2000-01-06T18:14:00Z').getTime();
+    const synodicMonth = 29.53058770576 * 24 * 60 * 60 * 1000;
+    const diff = timeMs - knownNewMoon;
+    const phase = (diff % synodicMonth) / synodicMonth;
+    return phase < 0 ? phase + 1 : phase;
+}
+
 export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, windSpeedMph, solarRadiation, rainRate }: { wmoCode: number, currentTime?: number, sunriseTime?: number, sunsetTime?: number, windSpeedMph?: number, solarRadiation?: number, rainRate?: number }) {
+  
+  // Calculate current moon phase based on the simulated or live time
+  const currentMoonPhase = useMemo(() => getMoonPhase(currentTime || Date.now()), [currentTime]);
   let isClear = wmoCode === 0 || wmoCode === 1;
   let isPartlyCloudy = wmoCode === 2;
   let isCloudy = wmoCode === 3;
@@ -497,6 +641,17 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
             hasClouds={hasClouds && !isPartlyCloudy}
           />
         )}
+        {!isDay && (
+          <AnimatedMoon 
+            sunX={sunX} 
+            sunY={sunY} 
+            sunZ={sunZ} 
+            hasClouds={hasClouds && !isPartlyCloudy}
+            phase={currentMoonPhase}
+          />
+        )}
+
+        {isStorm && <Lightning />}
 
         {(isRain || isHeavyRain || isDrizzle) && <Rain heavy={isHeavyRain} drizzle={isDrizzle} windSpeed={windSpeedMph} />}
         {isSnow && <Snow />}
