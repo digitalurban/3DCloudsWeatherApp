@@ -148,7 +148,9 @@ export default function App() {
         className="absolute inset-0 z-10 flex flex-col justify-between p-2 lg:p-6 pointer-events-none"
         style={{ 
           paddingTop: 'calc(env(safe-area-inset-top, 8px) + 20px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)'
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)',
+          paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
+          paddingRight: 'calc(env(safe-area-inset-right, 0px) + 20px)'
         }}
       >
         

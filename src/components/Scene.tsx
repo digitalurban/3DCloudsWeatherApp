@@ -261,13 +261,22 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
               uniform float opacity;
               varying vec2 vUv;
               void main() {
-                // Distance from center (0.0 to 0.5)
                 float dist = distance(vUv, vec2(0.5));
-                // Creates a gradient that is 1.0 at center and 0.0 at edge
-                float alpha = smoothstep(0.5, 0.0, dist);
-                // Sharpen the core and feather the edge using a power curve
-                alpha = pow(alpha, 2.0) * opacity;
-                gl_FragColor = vec4(color, alpha);
+                
+                // Defined inner core (solid until 0.1, fades shortly after)
+                float core = smoothstep(0.12, 0.05, dist);
+                
+                // Soft outer glow extending to the edge
+                float glow = smoothstep(0.5, 0.0, dist);
+                glow = pow(glow, 2.5); // Steep power curve to keep it mostly atmospheric bloom
+                
+                // Combine into an alpha mask
+                float alpha = clamp(core + glow, 0.0, 1.0) * opacity;
+                
+                // Add a very slight white hot-center to make the core pop
+                vec3 finalColor = mix(color, vec3(1.0), core * 0.4);
+                
+                gl_FragColor = vec4(finalColor, alpha);
               }
             `}
          />
@@ -330,8 +339,8 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
   // Base Aesthetics (Modified by Time)
   let skyParams = {
-    turbidity: 0.1,
-    rayleigh: isDuskDawn ? 1.5 : 0.8, // 0.8 yields a deep Mediterranean sky color 
+    turbidity: isDay ? 0.1 : 0.05, // Lower turbidity at night thins the air for stargazing
+    rayleigh: isDuskDawn ? 1.5 : (isDay ? 0.8 : 0.05), // Extremely low rayleigh drops the night sky into deep black/navy space
     mieCoefficient: 0.005, // 0.005 restores the proper internal Sky sun flare without looking misty
     mieDirectionalG: 0.8,
     sunPosition: new THREE.Vector3(sunX, sunY, sunZ),
