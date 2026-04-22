@@ -209,11 +209,9 @@ function SmoothLighting({
   );
 }
 
-function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }: { sunX: number, sunY: number, sunZ: number, solarRadiation?: number, isDuskDawn: boolean, hasClouds: boolean }) {
+function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: number, sunZ: number, hasClouds: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const coreMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const haloMeshRef = useRef<THREE.Mesh>(null);
   const initRef = useRef(false);
 
   useFrame((state, delta) => {
@@ -221,7 +219,6 @@ function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }
       const factor = 1.0 * delta;
       
       const targetPos = new THREE.Vector3(sunX, sunY, sunZ);
-      const targetHaloRadius = solarRadiation !== undefined ? 6 + (solarRadiation / 150) : 10;
       const targetOpacityMod = hasClouds ? 0.05 : 1.0;
       
       if (groupRef.current) {
@@ -234,20 +231,6 @@ function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }
           else coreMatRef.current.opacity = THREE.MathUtils.lerp(coreMatRef.current.opacity, targetOpacityMod, factor);
       }
       
-      if (haloMatRef.current) {
-          const baseHaloOpac = isDuskDawn ? 0.4 : 0.15;
-          const targetOpac = baseHaloOpac * targetOpacityMod;
-          if (!initRef.current) haloMatRef.current.opacity = targetOpac;
-          else haloMatRef.current.opacity = THREE.MathUtils.lerp(haloMatRef.current.opacity, targetOpac, factor);
-      }
-      
-      if (haloMeshRef.current) {
-          const scaleTarget = targetHaloRadius / 10;
-          const targetScaleVec = new THREE.Vector3(scaleTarget, scaleTarget, scaleTarget);
-          if (!initRef.current) haloMeshRef.current.scale.copy(targetScaleVec);
-          else haloMeshRef.current.scale.lerp(targetScaleVec, factor);
-      }
-      
       initRef.current = true;
   });
 
@@ -258,19 +241,8 @@ function AnimatedSun({ sunX, sunY, sunZ, solarRadiation, isDuskDawn, hasClouds }
          <sphereGeometry args={[4, 32, 32]} />
          <meshBasicMaterial 
             ref={coreMatRef}
-            color={isDuskDawn ? "#ffaa33" : "#ffffff"} 
+            color={"#ffffff"} 
             transparent
-         />
-       </mesh>
-       {/* Dynamic Solar Radiation Halo */}
-       <mesh ref={haloMeshRef}>
-         <sphereGeometry args={[10, 32, 32]} />
-         <meshBasicMaterial 
-            ref={haloMatRef}
-            color={isDuskDawn ? "#ff5500" : "#ffeedd"} 
-            transparent 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false}
          />
        </mesh>
     </group>
@@ -331,10 +303,10 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
   // Base Aesthetics (Modified by Time)
   let skyParams = {
-    turbidity: 1,
-    rayleigh: isDuskDawn ? 2.5 : 0.5,
-    mieCoefficient: 0.005,
-    mieDirectionalG: 0.7,
+    turbidity: 0.5,
+    rayleigh: isDuskDawn ? 2 : 0.3, // Lower rayleigh = deeper, richer dark blue
+    mieCoefficient: 0.0005, // Extremely low mie removes the thick white horizon band
+    mieDirectionalG: 0.9,
     sunPosition: new THREE.Vector3(sunX, sunY, sunZ),
   };
 
@@ -344,34 +316,41 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   if (isFog) {
       baseCloudColor = '#b0c4de';
       baseWorldLight = 0.5;
-      skyParams.turbidity = 20;
-      skyParams.rayleigh = 3;
+      skyParams.turbidity = 15;
+      skyParams.rayleigh = 2.5;
+      skyParams.mieCoefficient = 0.03;
   } else if (isStorm || isHeavyRain) {
       baseCloudColor = '#2b3036';
       baseWorldLight = 0.2;
-      skyParams.turbidity = 15;
+      skyParams.turbidity = 10;
+      skyParams.rayleigh = 1.0;
+      skyParams.mieCoefficient = 0.01;
   } else if (isRain) {
       baseCloudColor = '#606e7a';
       baseWorldLight = 0.4;
-      skyParams.turbidity = 8;
+      skyParams.turbidity = 5;
+      skyParams.rayleigh = 0.8;
   } else if (isDrizzle) {
       baseCloudColor = '#a0aec0';
       baseWorldLight = 0.7;
-      skyParams.turbidity = 4;
+      skyParams.turbidity = 2;
+      skyParams.rayleigh = 0.5;
   } else if (isSnow) {
       baseCloudColor = '#e5ecf0';
       baseWorldLight = 0.8;
-      skyParams.turbidity = 6;
+      skyParams.turbidity = 3;
+      skyParams.rayleigh = 0.5;
   } else if (isCloudy) {
       baseCloudColor = '#a0aec0';
       baseWorldLight = 0.6;
-      skyParams.turbidity = 6;
-      skyParams.rayleigh = 1.5;
+      skyParams.turbidity = 4;
+      skyParams.rayleigh = 1.0;
   } else if (isPartlyCloudy) {
-      skyParams.turbidity = 2;
+      skyParams.turbidity = 0.8;
+      skyParams.rayleigh = 0.4;
   } else {
-      skyParams.turbidity = 0.2;
-      skyParams.rayleigh = 0.1;
+      skyParams.turbidity = 0.1;
+      skyParams.rayleigh = 0.2;
   }
   
   // Real-time Solar Radiation Integration
@@ -445,7 +424,7 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   }, [isClear, isPartlyCloudy, hasClouds, isHeavyRain, isFog, finalCloudColor]);
 
   return (
-    <Canvas camera={{ position: [0, 2, 15], fov: 65 }}>
+    <Canvas camera={{ position: [0, 10, 20], fov: 65 }}>
       {isFog && <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.06} />}
       {!isFog && <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.001} />}
       
@@ -476,8 +455,6 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
             sunX={sunX} 
             sunY={sunY} 
             sunZ={sunZ} 
-            solarRadiation={solarRadiation} 
-            isDuskDawn={isDuskDawn} 
             hasClouds={hasClouds && !isPartlyCloudy}
           />
         )}
@@ -487,8 +464,9 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
         <OrbitControls 
           makeDefault 
-          minPolarAngle={Math.PI/3} 
-          maxPolarAngle={Math.PI/2 - 0.05} 
+          target={[0, 8, 0]}
+          minPolarAngle={Math.PI / 6} 
+          maxPolarAngle={Math.PI / 2 - 0.4} 
           enableZoom={true}
           minDistance={5}
           maxDistance={40}
