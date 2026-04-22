@@ -159,28 +159,28 @@ function Lightning() {
   useFrame((state, delta) => {
     if (!lightRef.current) return;
     
-    // 2% chance per frame to strike
+    // 2% chance per frame to strike (roughly 1 strike per second at 60fps)
     if (Math.random() > 0.98) {
-       // Huge burst of energy
-       lightRef.current.intensity = Math.random() * 800 + 400; 
+       // Massive burst of lightning energy to pierce the Lambert clouds
+       lightRef.current.intensity = Math.random() * 5000 + 2000; 
        
        // Move the flash randomly within the cloud ceiling layer
        lightRef.current.position.set(
-           (Math.random() - 0.5) * 80,
-           15 + Math.random() * 10,
-           (Math.random() - 0.5) * 80
+           (Math.random() - 0.5) * 100, // wider spread
+           10 + Math.random() * 15,
+           (Math.random() - 0.5) * 100
        );
     } else {
        // Fast immediate decay simulating the pop of lightning
-       lightRef.current.intensity = THREE.MathUtils.lerp(lightRef.current.intensity, 0, 15 * delta);
+       lightRef.current.intensity = THREE.MathUtils.lerp(lightRef.current.intensity, 0, 20 * delta);
     }
   });
 
   return (
     <pointLight 
       ref={lightRef} 
-      color="#cce6ff" 
-      distance={200} 
+      color="#dbe7ff" 
+      distance={400} 
       decay={2} 
       intensity={0} 
     />
