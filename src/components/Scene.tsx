@@ -211,24 +211,23 @@ function SmoothLighting({
 
 function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: number, sunZ: number, hasClouds: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
-  const coreMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const shaderMatRef = useRef<THREE.ShaderMaterial>(null);
   const initRef = useRef(false);
 
   useFrame((state, delta) => {
-      // Very smooth slow transition when weather updates
       const factor = 1.0 * delta;
       
       const targetPos = new THREE.Vector3(sunX, sunY, sunZ);
-      const targetOpacityMod = hasClouds ? 0.05 : 1.0;
+      const targetOpacityMod = hasClouds ? 0.02 : 0.6; // We can go a bit higher on opacity because it's additive and radial
       
       if (groupRef.current) {
           if (!initRef.current) groupRef.current.position.copy(targetPos);
           else groupRef.current.position.lerp(targetPos, factor);
       }
       
-      if (coreMatRef.current) {
-          if (!initRef.current) coreMatRef.current.opacity = targetOpacityMod;
-          else coreMatRef.current.opacity = THREE.MathUtils.lerp(coreMatRef.current.opacity, targetOpacityMod, factor);
+      if (shaderMatRef.current) {
+          if (!initRef.current) shaderMatRef.current.uniforms.opacity.value = targetOpacityMod;
+          else shaderMatRef.current.uniforms.opacity.value = THREE.MathUtils.lerp(shaderMatRef.current.uniforms.opacity.value, targetOpacityMod, factor);
       }
       
       initRef.current = true;
@@ -236,13 +235,41 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
 
   return (
     <group ref={groupRef}>
-       {/* Core */}
        <mesh>
-         <sphereGeometry args={[4, 32, 32]} />
-         <meshBasicMaterial 
-            ref={coreMatRef}
-            color={"#ffffff"} 
+         <planeGeometry args={[30, 30]} />
+         <shaderMaterial 
+            ref={shaderMatRef}
             transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            uniforms={{
+              color: { value: new THREE.Color('#ffe1b3') }, // Warm golden sunlight
+              opacity: { value: 0.6 }
+            }}
+            vertexShader={`
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                // Simple billboard logic so it always faces camera
+                vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+                mvPosition.xy += position.xy;
+                gl_Position = projectionMatrix * mvPosition;
+              }
+            `}
+            fragmentShader={`
+              uniform vec3 color;
+              uniform float opacity;
+              varying vec2 vUv;
+              void main() {
+                // Distance from center (0.0 to 0.5)
+                float dist = distance(vUv, vec2(0.5));
+                // Creates a gradient that is 1.0 at center and 0.0 at edge
+                float alpha = smoothstep(0.5, 0.0, dist);
+                // Sharpen the core and feather the edge using a power curve
+                alpha = pow(alpha, 2.0) * opacity;
+                gl_FragColor = vec4(color, alpha);
+              }
+            `}
          />
        </mesh>
     </group>
@@ -303,10 +330,10 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
   // Base Aesthetics (Modified by Time)
   let skyParams = {
-    turbidity: 0.5,
-    rayleigh: isDuskDawn ? 2 : 0.3, // Lower rayleigh = deeper, richer dark blue
-    mieCoefficient: 0.0005, // Extremely low mie removes the thick white horizon band
-    mieDirectionalG: 0.9,
+    turbidity: 0.1,
+    rayleigh: isDuskDawn ? 1.5 : 0.8, // 0.8 yields a deep Mediterranean sky color 
+    mieCoefficient: 0.005, // 0.005 restores the proper internal Sky sun flare without looking misty
+    mieDirectionalG: 0.8,
     sunPosition: new THREE.Vector3(sunX, sunY, sunZ),
   };
 
@@ -424,15 +451,18 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   }, [isClear, isPartlyCloudy, hasClouds, isHeavyRain, isFog, finalCloudColor]);
 
   return (
-    <Canvas camera={{ position: [0, 10, 20], fov: 65 }}>
-      {isFog && <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.06} />}
-      {!isFog && <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.001} />}
+    <Canvas camera={{ position: [0, 8, 20], fov: 65 }}>
+      {isFog ? <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.06} /> : null}
       
       <Suspense fallback={null}>
         {(!isDay && (isClear || isPartlyCloudy)) && (
            <Stars radius={100} depth={50} count={isClear ? 4000 : 1500} factor={4} saturation={0} fade speed={1} />
         )}
-        <Sky {...skyParams} />
+
+        {/* By adding a massive drop on the Y axis, we maintain the beautiful zenith blue but physically push the grey shader horizon mist down beneath the floor */}
+        <group position={[0, -50000, 0]}>
+            <Sky {...skyParams} />
+        </group>
         
         <SmoothLighting 
           ambIntensity={ambIntensity} 
@@ -464,9 +494,9 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
         <OrbitControls 
           makeDefault 
-          target={[0, 8, 0]}
-          minPolarAngle={Math.PI / 6} 
-          maxPolarAngle={Math.PI / 2 - 0.4} 
+          target={[0, 4, 0]}
+          minPolarAngle={0} 
+          maxPolarAngle={Math.PI} 
           enableZoom={true}
           minDistance={5}
           maxDistance={40}
