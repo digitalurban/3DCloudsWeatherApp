@@ -248,6 +248,12 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
   const shaderMatRef = useRef<THREE.ShaderMaterial>(null);
   const initRef = useRef(false);
 
+  const uniforms = useMemo(() => ({
+    color: { value: new THREE.Color('#ffe1b3') }, // Warm golden sunlight
+    opacity: { value: 0.0 }, // Start at 0 and let useFrame lerp it up to the correct value
+    worldY: { value: 0.0 }
+  }), []);
+
   useFrame((state, delta) => {
       const factor = 1.0 * delta;
       
@@ -260,6 +266,7 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
       }
       
       if (shaderMatRef.current) {
+          shaderMatRef.current.uniforms.worldY.value = groupRef.current ? groupRef.current.position.y : 0;
           if (!initRef.current) shaderMatRef.current.uniforms.opacity.value = targetOpacityMod;
           else shaderMatRef.current.uniforms.opacity.value = THREE.MathUtils.lerp(shaderMatRef.current.uniforms.opacity.value, targetOpacityMod, factor);
       }
@@ -276,14 +283,13 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
             transparent
             depthWrite={false}
             blending={THREE.AdditiveBlending}
-            uniforms={{
-              color: { value: new THREE.Color('#ffe1b3') }, // Warm golden sunlight
-              opacity: { value: 0.6 }
-            }}
+            uniforms={uniforms}
             vertexShader={`
               varying vec2 vUv;
+              varying float vLocalY;
               void main() {
                 vUv = uv;
+                vLocalY = position.y;
                 // Simple billboard logic so it always faces camera
                 vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
                 mvPosition.xy += position.xy;
@@ -293,7 +299,9 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
             fragmentShader={`
               uniform vec3 color;
               uniform float opacity;
+              uniform float worldY;
               varying vec2 vUv;
+              varying float vLocalY;
               void main() {
                 float dist = distance(vUv, vec2(0.5));
                 
@@ -306,6 +314,11 @@ function AnimatedSun({ sunX, sunY, sunZ, hasClouds }: { sunX: number, sunY: numb
                 
                 // Combine into an alpha mask
                 float alpha = clamp(core + glow, 0.0, 1.0) * opacity;
+                
+                // Physical horizon clip (fades out as it crosses Y=0 to Y=-2)
+                float fragY = worldY + vLocalY;
+                float horizonFade = smoothstep(-2.0, 2.0, fragY);
+                alpha *= horizonFade;
                 
                 // Add a very slight white hot-center to make the core pop
                 vec3 finalColor = mix(color, vec3(1.0), core * 0.4);
@@ -324,11 +337,18 @@ function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, su
   const shaderMatRef = useRef<THREE.ShaderMaterial>(null);
   const initRef = useRef(false);
 
+  const uniforms = useMemo(() => ({
+    color: { value: new THREE.Color('#e0e8ff') }, // Cool silver/blue moonlight
+    opacity: { value: 0.0 }, // Start at 0 and let useFrame lerp it up
+    phase: { value: phase },
+    worldY: { value: 0.0 }
+  }), []);
+
+  // Make sure phase updates softly without recreating the entire uniform object
   useFrame((state, delta) => {
       const factor = 1.0 * delta;
       
-      // Moon is roughly opposite the sun
-      const targetPos = new THREE.Vector3(-sunX, -sunY, -sunZ);
+      const targetPos = new THREE.Vector3(sunX, sunY, sunZ);
       const targetOpacityMod = hasClouds ? 0.01 : 0.8; // Boost opacity as phase masks dim the output
       
       if (groupRef.current) {
@@ -337,6 +357,9 @@ function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, su
       }
       
       if (shaderMatRef.current) {
+          shaderMatRef.current.uniforms.phase.value = phase;
+          shaderMatRef.current.uniforms.worldY.value = groupRef.current ? groupRef.current.position.y : 0;
+          
           if (!initRef.current) shaderMatRef.current.uniforms.opacity.value = targetOpacityMod;
           else shaderMatRef.current.uniforms.opacity.value = THREE.MathUtils.lerp(shaderMatRef.current.uniforms.opacity.value, targetOpacityMod, factor);
       }
@@ -353,15 +376,13 @@ function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, su
             transparent
             depthWrite={false}
             blending={THREE.AdditiveBlending}
-            uniforms={{
-              color: { value: new THREE.Color('#e0e8ff') }, // Cool silver/blue moonlight
-              opacity: { value: 0.0 },
-              phase: { value: phase } // Pass real-time moon phase
-            }}
+            uniforms={uniforms}
             vertexShader={`
               varying vec2 vUv;
+              varying float vLocalY;
               void main() {
                 vUv = uv;
+                vLocalY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
                 mvPosition.xy += position.xy;
                 gl_Position = projectionMatrix * mvPosition;
@@ -371,7 +392,9 @@ function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, su
               uniform vec3 color;
               uniform float opacity;
               uniform float phase;
+              uniform float worldY;
               varying vec2 vUv;
+              varying float vLocalY;
               void main() {
                 vec2 p = vUv * 2.0 - 1.0; 
                 float dist = length(p);
@@ -405,6 +428,11 @@ function AnimatedMoon({ sunX, sunY, sunZ, hasClouds, phase }: { sunX: number, su
                 float phaseGlowScalar = max(0.1, (1.0 + cos(theta)) * 0.5); 
                 
                 float alpha = clamp(finalMoon + glow * phaseGlowScalar, 0.0, 1.0) * opacity;
+                
+                // Physical horizon clip (fades out as it crosses Y=0 to Y=-2)
+                float fragY = worldY + vLocalY;
+                float horizonFade = smoothstep(-2.0, 2.0, fragY);
+                alpha *= horizonFade;
                 
                 vec3 finalColor = mix(color, vec3(1.0), finalMoon * 0.4);
                 gl_FragColor = vec4(finalColor, alpha);
@@ -456,28 +484,59 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   let hasClouds = isCloudy || isPartlyCloudy || isDrizzle || isRain || isHeavyRain || isSnow || isStorm || isFog;
 
   // Day/Night and Sun Positioning
-  let sunY = 20;
-  let sunX = 80;
-  let sunZ = -120;
+  let sunY = -20;
+  let sunX = 0;
+  let sunZ = -120; // Anchor it deep into the scene background
+  
+  let moonY = -20;
+  let moonX = -80; // Default offscreen
+  let moonZ = -120; // Anchor it in the exact same Z plane as the sun so the user doesn't have to rotate the camera 180 degrees
   
   let isDay = true;
   let isDuskDawn = false;
 
   if (currentTime && sunriseTime && sunsetTime) {
-      isDay = currentTime > sunriseTime && currentTime < sunsetTime;
+      isDay = currentTime >= sunriseTime && currentTime < sunsetTime;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      
+      // Calculate continuous Sun Position
       if (isDay) {
           const dayLength = sunsetTime - sunriseTime;
           const progress = (currentTime - sunriseTime) / dayLength; // 0.0 to 1.0 throughout the day
           const angle = Math.PI * progress; 
-          sunX = 80 * Math.cos(angle);
-          sunY = Math.max(-10, 40 * Math.sin(angle));
+          sunX = 160 * Math.cos(angle); // 160 -> -160
+          sunY = 140 * Math.sin(angle); // 0 -> 140 -> 0
           
-          if (sunY > 0 && sunY < 20) {
+          moonX = -sunX;
+          moonY = -sunY; // Sunk beneath the floor
+          
+          if (sunY > -5 && sunY < 20) {
               isDuskDawn = true;
           }
       } else {
-          sunY = -20;
-          sunX = 0;
+          let nightProgress;
+          if (currentTime >= sunsetTime) {
+              const nextSunrise = sunriseTime + msPerDay;
+              const nightLength = nextSunrise - sunsetTime;
+              nightProgress = (currentTime - sunsetTime) / nightLength;
+          } else {
+              const prevSunset = sunsetTime - msPerDay;
+              const nightLength = sunriseTime - prevSunset;
+              nightProgress = (currentTime - prevSunset) / nightLength;
+          }
+          
+          const nightAngle = Math.PI * nightProgress; 
+          
+          // Full Moon visual parity: as Sun sets at -160 (West), Moon rises at 160 (East)
+          moonX = 160 * Math.cos(nightAngle); 
+          moonY = 140 * Math.sin(nightAngle); 
+          
+          sunX = -moonX;
+          sunY = -moonY; // Sun travels backwards underground
+          
+          if (sunY >= -20 && sunY <= 0) {
+              isDuskDawn = true;
+          }
       }
   }
 
@@ -632,24 +691,20 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           {cloudElements}
         </CloudDrifter>
 
-        {/* Physical Sun Representation - visible during the day, even if overcast. Fades behind clouds via opacityMod. */}
-        {isDay && (
-          <AnimatedSun 
-            sunX={sunX} 
-            sunY={sunY} 
-            sunZ={sunZ} 
-            hasClouds={hasClouds && !isPartlyCloudy}
-          />
-        )}
-        {!isDay && (
-          <AnimatedMoon 
-            sunX={sunX} 
-            sunY={sunY} 
-            sunZ={sunZ} 
-            hasClouds={hasClouds && !isPartlyCloudy}
-            phase={currentMoonPhase}
-          />
-        )}
+        {/* Physical Celestial Bodies */}
+        <AnimatedSun 
+          sunX={sunX} 
+          sunY={sunY} 
+          sunZ={sunZ} 
+          hasClouds={hasClouds && !isPartlyCloudy}
+        />
+        <AnimatedMoon 
+          sunX={moonX} 
+          sunY={moonY} 
+          sunZ={moonZ} 
+          hasClouds={hasClouds && !isPartlyCloudy}
+          phase={currentMoonPhase}
+        />
 
         {isStorm && <Lightning />}
 
@@ -658,7 +713,7 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
         <OrbitControls 
           makeDefault 
-          target={[0, 4, 0]}
+          target={[0, 22, 0]}
           minPolarAngle={0} 
           maxPolarAngle={Math.PI} 
           enableZoom={true}
