@@ -2,7 +2,7 @@ import { useState, Suspense, useEffect } from 'react';
 import Scene from './components/Scene';
 import WeatherDashboard, { getWmoDescription } from './components/WeatherDashboard';
 import ScreenDrops from './components/ScreenDrops';
-import { MapPin, Clock, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Loader2, Sunrise } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -27,11 +27,20 @@ export default function App() {
 
     const fetchWeather = async () => {
       try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,precipitation_probability_max&wind_speed_unit=mph&timezone=Europe%2FLondon', { signal: controller.signal });
+        const [res, airRes] = await Promise.all([
+            fetch('https://api.open-meteo.com/v1/forecast?latitude=52.6075&longitude=0.3831&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,precipitation,visibility&hourly=temperature_2m,weather_code,precipitation_probability&daily=uv_index_max,sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,precipitation_probability_max&wind_speed_unit=mph&timezone=Europe%2FLondon', { signal: controller.signal }),
+            fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=52.6075&longitude=0.3831&current=european_aqi,pm10,pm2_5&timezone=Europe%2FLondon', { signal: controller.signal }).catch(() => null)
+        ]);
         
         if (!res.ok) throw new Error("API returned an error code.");
         const data = await res.json();
         
+        let airData = null;
+        if (airRes && airRes.ok) {
+            airData = await airRes.json();
+        }
+        
+        data.airQuality = airData;
         setWeatherData(data);
         const now = new Date();
         setLastUpdateTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -162,9 +171,20 @@ export default function App() {
                 <MapPin size={10} />
                 <span>Downham Market, Fincham</span>
               </div>
-              <div className="flex items-center gap-1 text-white/80 text-[6px] lg:text-[9px] font-sans uppercase tracking-widest mt-0.5">
-                <Clock size={8} />
-                <span>{mqttData ? 'MQTT Connected (Live)' : 'Fetching API Fallback...'}</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-1 text-white/80 text-[6px] lg:text-[9px] font-sans uppercase tracking-widest">
+                  <Clock size={8} />
+                  <span>{mqttData ? 'Live' : 'API Fallback'}</span>
+                </div>
+                {weatherData?.daily?.sunrise?.[0] && weatherData?.daily?.sunset?.[0] && (
+                    <div className="flex items-center gap-1 text-white/80 text-[6px] lg:text-[9px] font-sans uppercase tracking-widest pl-2 border-l border-white/20">
+                      <Sunrise size={8} />
+                      <span>
+                        {new Date(weatherData.daily.sunrise[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • 
+                        {new Date(weatherData.daily.sunset[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { CloudRain, Sun, Wind, Droplets, Cloud as CloudIcon, ThermometerSun, Eye, Gauge, SunDim, Sunrise, Navigation, TrendingUp, TrendingDown, Minus, CloudSun, CloudFog, CloudSnow, CloudLightning } from 'lucide-react';
+import { CloudRain, Sun, Wind, Droplets, Cloud as CloudIcon, ThermometerSun, Eye, Gauge, SunDim, Sunrise, Navigation, TrendingUp, TrendingDown, Minus, CloudSun, CloudFog, CloudSnow, CloudLightning, Leaf } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -68,13 +68,13 @@ export const getWmoDescription = (code: number) => {
 };
 
 const Card = ({ title, icon: Icon, value, unit, sub, rightElement }: { title: string, icon: any, value: string | React.ReactNode, unit?: string, sub?: string | React.ReactNode, rightElement?: React.ReactNode }) => (
-  <div className="backdrop-blur-xl bg-black/60 border border-white/20 p-1.5 md:p-2 lg:p-3 flex flex-col text-white shadow-2xl transition-all duration-300 hover:bg-black/80 flex-[0_0_auto] md:flex-1 min-w-[90px] md:min-w-0 snap-start justify-center">
-    <div className="flex items-center justify-between mb-0.5 lg:mb-1 pb-1 border-b border-white/20">
-      <span className="text-[8px] md:text-[10px] lg:text-[11px] font-sans uppercase tracking-[0.1em] lg:tracking-[0.2em] line-clamp-1 truncate mr-1">{title}</span>
+  <div className="backdrop-blur-xl bg-black/60 border border-white/20 p-1.5 md:p-1.5 lg:p-3 flex flex-col text-white shadow-2xl transition-all duration-300 hover:bg-black/80 flex-[0_0_auto] md:flex-1 min-w-[80px] md:min-w-0 snap-start justify-center">
+    <div className="flex items-center justify-between mb-0.5 lg:mb-1 pb-1 border-b border-white/20 gap-1">
+      <span className="text-[7px] min-[768px]:text-[7px] min-[820px]:text-[8px] lg:text-[10px] xl:text-[11px] font-sans uppercase tracking-normal lg:tracking-[0.1em] line-clamp-1 break-all truncate">{title}</span>
       <Icon size={12} className="text-white opacity-80 shrink-0 lg:w-3.5 lg:h-3.5" />
     </div>
     <div className="flex items-center">
-        <div className="text-xs md:text-sm lg:text-lg font-serif tracking-tight truncate flex items-baseline relative min-h-[1.2rem] gap-[0.2em]">
+        <div className="text-[10px] min-[768px]:text-xs lg:text-lg font-serif tracking-tight truncate flex items-baseline relative min-h-[1.2rem] gap-[0.2em] whitespace-nowrap">
            <AnimatePresence mode="popLayout">
              <motion.span
                key={String(value)}
@@ -90,12 +90,12 @@ const Card = ({ title, icon: Icon, value, unit, sub, rightElement }: { title: st
            {unit && <span className="inline-block">{unit.trim()}</span>}
         </div>
         {rightElement && (
-            <div className="ml-auto">
+            <div className="ml-auto scale-75 lg:scale-100 origin-right">
                 {rightElement}
             </div>
         )}
     </div>
-    {sub && <div className="mt-0.5 lg:mt-1 text-[7px] md:text-[8px] lg:text-[9px] font-sans uppercase tracking-widest opacity-60 truncate relative min-h-[1.2em] flex items-center">{sub}</div>}
+    {sub && <div className="mt-0.5 lg:mt-1 text-[6px] min-[768px]:text-[7px] lg:text-[9px] font-sans uppercase tracking-[0.1em] lg:tracking-widest opacity-60 truncate relative min-h-[1.2em] flex items-center">{sub}</div>}
   </div>
 );
 
@@ -211,6 +211,34 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   const hourlyData = [];
   const dailyData = [];
   
+  const aqiVal = realData?.airQuality?.current?.european_aqi;
+  const pm25Val = realData?.airQuality?.current?.pm2_5;
+  const aqiDisplay = aqiVal !== undefined ? Math.round(aqiVal) : '--';
+  
+  let aqiSub = "AQI";
+  if (pm25Val !== undefined) {
+      aqiSub = `PM2.5: ${Math.round(pm25Val)} μg/m³`;
+  }
+  
+  let aqiColorClass = "text-white";
+  if (aqiVal !== undefined) {
+      if (aqiVal <= 20) aqiColorClass = "text-emerald-400";
+      else if (aqiVal <= 40) aqiColorClass = "text-green-300";
+      else if (aqiVal <= 60) aqiColorClass = "text-yellow-300";
+      else if (aqiVal <= 80) aqiColorClass = "text-orange-400";
+      else if (aqiVal <= 100) aqiColorClass = "text-red-400";
+      else aqiColorClass = "text-purple-400";
+  }
+
+  let AqiElement = undefined;
+  if (aqiVal !== undefined) {
+       AqiElement = (
+          <div className="flex items-center text-xs md:text-sm lg:text-lg font-serif">
+               <span className={aqiColorClass}>{aqiDisplay}</span>
+          </div>
+       );
+  }
+
   if (realData?.hourly?.time) {
     const now = new Date().getTime();
     let startIndex = realData.hourly.time.findIndex((t: string) => new Date(t).getTime() > now);
@@ -305,7 +333,7 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
         <Card title="Light" icon={SunDim} value={uvVal} sub="UV" rightElement={lightRightElement} />
         <Card title={mqttData ? "Cloudbase" : "Visibility"} icon={Eye} value={cloudbaseVal} unit={mqttData ? " m" : " km"} sub="Above ground" />
         <Card title="Pressure" icon={Gauge} value={pressureVal} unit=" hPa" sub={baroSub} rightElement={baroRightElement} />
-        <Card title="Sun" icon={Sunrise} value={sunStr} sub="Rise • Set" />
+        <Card title="Air Quality" icon={Leaf} value={AqiElement ? "" : aqiDisplay} sub={aqiSub} rightElement={AqiElement} />
       </div>
     </div>
   );
