@@ -493,7 +493,6 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   let moonZ = -120; // Anchor it in the exact same Z plane as the sun so the user doesn't have to rotate the camera 180 degrees
   
   let isDay = true;
-  let isDuskDawn = false;
 
   if (currentTime && sunriseTime && sunsetTime) {
       isDay = currentTime >= sunriseTime && currentTime < sunsetTime;
@@ -504,15 +503,11 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           const dayLength = sunsetTime - sunriseTime;
           const progress = (currentTime - sunriseTime) / dayLength; // 0.0 to 1.0 throughout the day
           const angle = Math.PI * progress; 
-          sunX = 160 * Math.cos(angle); // 160 -> -160
-          sunY = 140 * Math.sin(angle); // 0 -> 140 -> 0
+          sunX = 140 * Math.cos(angle); // 140 -> -140
+          sunY = 70 * Math.sin(angle); // 0 -> 70 -> 0
           
           moonX = -sunX;
           moonY = -sunY; // Sunk beneath the floor
-          
-          if (sunY > -5 && sunY < 20) {
-              isDuskDawn = true;
-          }
       } else {
           let nightProgress;
           if (currentTime >= sunsetTime) {
@@ -527,133 +522,154 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
           
           const nightAngle = Math.PI * nightProgress; 
           
-          // Full Moon visual parity: as Sun sets at -160 (West), Moon rises at 160 (East)
-          moonX = 160 * Math.cos(nightAngle); 
-          moonY = 140 * Math.sin(nightAngle); 
+          // Full Moon visual parity: as Sun sets at -140 (West), Moon rises at 140 (East)
+          moonX = 140 * Math.cos(nightAngle); 
+          moonY = 70 * Math.sin(nightAngle); 
           
           sunX = -moonX;
           sunY = -moonY; // Sun travels backwards underground
-          
-          if (sunY >= -20 && sunY <= 0) {
-              isDuskDawn = true;
-          }
       }
   }
 
-  // Base Aesthetics (Modified by Time)
-  let skyParams = {
-    turbidity: isDay ? 0.1 : 0.05, // Lower turbidity at night thins the air for stargazing
-    rayleigh: isDuskDawn ? 1.5 : (isDay ? 0.8 : 0.05), // Extremely low rayleigh drops the night sky into deep black/navy space
-    mieCoefficient: 0.005, // 0.005 restores the proper internal Sky sun flare without looking misty
-    mieDirectionalG: 0.8,
-    sunPosition: new THREE.Vector3(sunX, sunY, sunZ),
-  };
-
+  // Base Weather Aesthetics
   let baseCloudColor = '#ffffff';
   let baseWorldLight = 1.0;
+  let weatherRayleigh = 0.5;
+  let weatherTurbidity = 0.1;
+  let weatherMie = 0.005;
 
   if (isFog) {
       baseCloudColor = '#b0c4de';
       baseWorldLight = 0.5;
-      skyParams.turbidity = 15;
-      skyParams.rayleigh = 2.5;
-      skyParams.mieCoefficient = 0.03;
+      weatherTurbidity = 15;
+      weatherRayleigh = 2.5;
+      weatherMie = 0.03;
   } else if (isStorm || isHeavyRain) {
       baseCloudColor = '#2b3036';
       baseWorldLight = 0.2;
-      skyParams.turbidity = 10;
-      skyParams.rayleigh = 1.0;
-      skyParams.mieCoefficient = 0.01;
+      weatherTurbidity = 10;
+      weatherRayleigh = 1.0;
+      weatherMie = 0.01;
   } else if (isRain) {
       baseCloudColor = '#606e7a';
       baseWorldLight = 0.4;
-      skyParams.turbidity = 5;
-      skyParams.rayleigh = 0.8;
+      weatherTurbidity = 5;
+      weatherRayleigh = 0.8;
   } else if (isDrizzle) {
       baseCloudColor = '#a0aec0';
       baseWorldLight = 0.7;
-      skyParams.turbidity = 2;
-      skyParams.rayleigh = 0.5;
+      weatherTurbidity = 2;
+      weatherRayleigh = 0.5;
   } else if (isSnow) {
       baseCloudColor = '#e5ecf0';
       baseWorldLight = 0.8;
-      skyParams.turbidity = 3;
-      skyParams.rayleigh = 0.5;
+      weatherTurbidity = 3;
+      weatherRayleigh = 0.5;
   } else if (isCloudy) {
       baseCloudColor = '#a0aec0';
       baseWorldLight = 0.6;
-      skyParams.turbidity = 4;
-      skyParams.rayleigh = 1.0;
+      weatherTurbidity = 4;
+      weatherRayleigh = 1.0;
   } else if (isPartlyCloudy) {
-      skyParams.turbidity = 0.8;
-      skyParams.rayleigh = 0.4;
+      weatherTurbidity = 0.8;
+      weatherRayleigh = 0.4;
   } else {
-      skyParams.turbidity = 0.1;
-      skyParams.rayleigh = 0.2;
+      weatherTurbidity = 0.1;
+      weatherRayleigh = 0.2;
   }
-  
+
   // Real-time Solar Radiation Integration
-  // A bright sunny day is typically 800-1000 W/m², overcast drops down to 100-300
   if (isDay && solarRadiation !== undefined) {
-      // Create a sensible scalar bounded from 0.2 to 1.5 (20% to 150% brightness)
       const radScalar = Math.max(0.2, Math.min(1.5, solarRadiation / 800));
-      // Only blend it in so we don't totally crush the WMO code baseline
       baseWorldLight = (baseWorldLight * 0.4) + (radScalar * 0.6);
   }
 
-  // Apply Time Modifiers
-  let finalCloudColor = baseCloudColor;
-  let finalDirLightColor = '#ffffff';
-  let ambIntensity = 0.8 * baseWorldLight;
-  let dirIntensity = 1.5 * baseWorldLight;
+  // 1. Calculate general day/night intensity multiplier based on sunY (-20 to +10)
+  let timeOfDayLightBlend = 1.0;
+  if (sunY > 10) timeOfDayLightBlend = 1.0;
+  else if (sunY < -15) timeOfDayLightBlend = 0.0;
+  else {
+      timeOfDayLightBlend = (sunY + 15) / 25; 
+      timeOfDayLightBlend = THREE.MathUtils.clamp(timeOfDayLightBlend, 0, 1);
+  }
 
-  if (!isDay) {
-      finalCloudColor = '#0b111a'; // pitch dark blue/grey
-      finalDirLightColor = '#507094'; // dim moonlight
-      ambIntensity = 0.1 * baseWorldLight;
-      dirIntensity = 0.2 * baseWorldLight;
-  } else if (isDuskDawn) {
-      finalDirLightColor = '#ff8a47'; // sunset orange
-      ambIntensity = 0.5 * baseWorldLight;
-      dirIntensity = 1.2 * baseWorldLight;
-      if (!isStorm && !isHeavyRain && !isRain) {
-          finalCloudColor = '#fceade'; // tint clouds warm
+  // 2. Sunset/Sunrise factor (Peaks exactly at horizon Y=0 to Y=10)
+  let sunsetFactor = 0;
+  if (sunY > -15 && sunY < 25) {
+      if (sunY >= 5) sunsetFactor = 1.0 - ((sunY - 5) / 20);
+      else sunsetFactor = 1.0 - ((5 - sunY) / 20);
+      
+      sunsetFactor = THREE.MathUtils.clamp(sunsetFactor, 0, 1);
+      sunsetFactor = sunsetFactor * sunsetFactor * (3 - 2 * sunsetFactor); // smoothstep
+  }
+
+  // Set Lighting Intensities
+  let ambIntensity = THREE.MathUtils.lerp(0.1, 0.8, timeOfDayLightBlend) * baseWorldLight;
+  let dirIntensity = THREE.MathUtils.lerp(0.2, 1.5, timeOfDayLightBlend) * baseWorldLight;
+
+  // Set Colors (Base Day vs Deep Night)
+  const currentCloudColor = new THREE.Color('#0b111a').lerp(new THREE.Color(baseCloudColor), timeOfDayLightBlend);
+  const currentLightColor = new THREE.Color('#507094').lerp(new THREE.Color('#ffffff'), timeOfDayLightBlend);
+
+  // Inject Vibrant Sunset/Sunrise Hues
+  if (sunsetFactor > 0) {
+      const sunsetOrangeLight = new THREE.Color('#ff7b00');
+      currentLightColor.lerp(sunsetOrangeLight, sunsetFactor * 0.8);
+
+      // Only tint clouds pink/orange if it's not raining/storming
+      if (!isStorm && !isHeavyRain && !isRain && !isSnow) {
+          const sunsetPinkCloud = new THREE.Color('#ff8fa3');
+          // Add a touch of deep golden to the white mix for an epic sky fire
+          const goldenMix = new THREE.Color('#ffa700').lerp(sunsetPinkCloud, 0.5);
+          currentCloudColor.lerp(goldenMix, sunsetFactor * 0.7);
       }
   }
+
+  const finalCloudColor = currentCloudColor.getStyle();
+  const finalDirLightColor = currentLightColor.getStyle();
+
+  // Majestic Sky Shader Parameters
+  let skyParams = {
+    turbidity: weatherTurbidity + (sunsetFactor * 0.3),
+    rayleigh: THREE.MathUtils.lerp(0.05, weatherRayleigh, timeOfDayLightBlend) + (sunsetFactor * 2.5), 
+    mieCoefficient: weatherMie + (sunsetFactor * 0.005),
+    mieDirectionalG: 0.8,
+    sunPosition: new THREE.Vector3(sunX, sunY, sunZ),
+  };
 
   const cloudElements = useMemo(() => {
     return (
       <Clouds material={THREE.MeshLambertMaterial} limit={2000}>
         {isClear && (
           <>
-             <Cloud position={[5, 10, -20]} bounds={[15, 2, 10]} volume={5} color={finalCloudColor} speed={0.02} opacity={0.15} />
-             <Cloud position={[-10, 12, -15]} bounds={[10, 1.5, 8]} volume={3} color={finalCloudColor} speed={0.03} opacity={0.1} />
+             <Cloud position={[5, 16, -20]} bounds={[15, 2, 10]} volume={5} color={finalCloudColor} speed={0.02} opacity={0.15} />
+             <Cloud position={[-10, 18, -15]} bounds={[10, 1.5, 8]} volume={3} color={finalCloudColor} speed={0.03} opacity={0.1} />
           </>
         )}
 
         {isPartlyCloudy && (
           <>
-            <Cloud position={[-6, 6, -15]} bounds={[10, 5, 10]} volume={10} color={finalCloudColor} speed={0.04} opacity={0.6} />
-            <Cloud position={[6, 8, -20]} bounds={[10, 4, 10]} volume={10} color={finalCloudColor} speed={0.03} opacity={0.7} />
-            <Cloud position={[0, 10, -25]} bounds={[15, 6, 15]} volume={15} color={finalCloudColor} speed={0.02} opacity={0.5} />
+            <Cloud position={[-6, 12, -15]} bounds={[10, 5, 10]} volume={10} color={finalCloudColor} speed={0.04} opacity={0.6} />
+            <Cloud position={[6, 14, -20]} bounds={[10, 4, 10]} volume={10} color={finalCloudColor} speed={0.03} opacity={0.7} />
+            <Cloud position={[0, 16, -25]} bounds={[15, 6, 15]} volume={15} color={finalCloudColor} speed={0.02} opacity={0.5} />
           </>
         )}
 
         {(hasClouds && !isPartlyCloudy && !isClear) && (
           <>
-            <Cloud position={[0, 8, -10]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.1 : 0.04} opacity={0.8} />
-            <Cloud position={[-15, 10, -20]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.12 : 0.05} opacity={isFog ? 0.3 : 0.85} />
-            <Cloud position={[15, 10, -15]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.03} opacity={isFog ? 0.2 : 0.8} />
-            <Cloud position={[0, 12, -30]} bounds={[30, 10, 30]} volume={30} color={finalCloudColor} speed={isHeavyRain ? 0.06 : 0.02} opacity={0.9} />
+            <Cloud position={[0, 14, -10]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.1 : 0.04} opacity={0.8} />
+            <Cloud position={[-15, 16, -20]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.12 : 0.05} opacity={isFog ? 0.3 : 0.85} />
+            <Cloud position={[15, 16, -15]} bounds={[25, 8, 25]} volume={25} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.03} opacity={isFog ? 0.2 : 0.8} />
+            <Cloud position={[0, 18, -30]} bounds={[30, 10, 30]} volume={30} color={finalCloudColor} speed={isHeavyRain ? 0.06 : 0.02} opacity={0.9} />
             
-            <Cloud position={[20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
-            <Cloud position={[-20, 10, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
-            <Cloud position={[0, 12, 15]} bounds={[30, 8, 30]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
+            <Cloud position={[20, 16, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
+            <Cloud position={[-20, 16, 10]} bounds={[25, 8, 25]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
+            <Cloud position={[0, 18, 15]} bounds={[30, 8, 30]} volume={20} color={finalCloudColor} speed={isHeavyRain ? 0.08 : 0.02} opacity={0.8} />
             
             {isHeavyRain && (
               <>
-                <Cloud position={[5, 14, -5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.1} opacity={0.95} />
-                <Cloud position={[-10, 16, 5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.09} opacity={0.95} />
+                <Cloud position={[5, 20, -5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.1} opacity={0.95} />
+                <Cloud position={[-10, 22, 5]} bounds={[35, 10, 35]} volume={40} color={finalCloudColor} speed={0.09} opacity={0.95} />
               </>
             )}
           </>
@@ -713,9 +729,9 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
 
         <OrbitControls 
           makeDefault 
-          target={[0, 22, 0]}
+          target={[0, 9, 0]}
           minPolarAngle={0} 
-          maxPolarAngle={Math.PI} 
+          maxPolarAngle={Math.PI / 2} 
           enableZoom={true}
           minDistance={5}
           maxDistance={40}
