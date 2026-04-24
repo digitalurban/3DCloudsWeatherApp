@@ -27,13 +27,16 @@ async function startServer() {
     client.subscribe('personal/ucfnaps/downhamweather/barotrend', (err) => {
       if (!err) console.log('📡 Subscribed to barotrend topic');
     });
+    client.subscribe('personal/ucfnaps/downhamweather/windmax', (err) => {
+      if (!err) console.log('📡 Subscribed to windmax topic');
+    });
   });
 
   client.on('message', (topic, message) => {
     try {
       const payloadStr = message.toString();
       if (topic === 'personal/ucfnaps/downhamweather/loop') {
-          // The loop sends a full JSON payload, merge it while keeping barotrend
+          // The loop sends a full JSON payload, merge it while keeping barotrend and windmax
           const parsed = JSON.parse(payloadStr);
           latestMqttData = { ...latestMqttData, ...parsed };
       } else if (topic === 'personal/ucfnaps/downhamweather/barotrend') {
@@ -46,6 +49,13 @@ async function startServer() {
           
           if (!latestMqttData) latestMqttData = {};
           latestMqttData.barotrend = val;
+      } else if (topic === 'personal/ucfnaps/downhamweather/windmax') {
+          let val = payloadStr;
+          try {
+              val = JSON.parse(payloadStr);
+          } catch(e) {}
+          if (!latestMqttData) latestMqttData = {};
+          latestMqttData.windmax = val;
       }
     } catch(e) {
       console.error(`Failed to handle MQTT message for ${topic}`, e);

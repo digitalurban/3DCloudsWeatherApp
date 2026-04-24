@@ -132,8 +132,8 @@ export default function WeatherDashboard({ condition, realData, mqttData }: { co
   
   const windVal = mqttData?.windSpeed_mph ? mqttData.windSpeed_mph : realData ? Math.round(realData.current.wind_speed_10m) : '--';
       
-  const gustStr = mqttData?.windGust10 && parseFloat(mqttData.windGust10) > 0 ? ` • Gust ${Math.round(parseFloat(mqttData.windGust10))}` : '';
-  const windDir = mqttData?.windDir ? `DIR ${windDirDegree}°${gustStr}` : 'API Winds';
+  const maxGustStr = mqttData?.windmax && parseFloat(mqttData.windmax) > 0 ? ` • Max Gust ${Math.round(parseFloat(mqttData.windmax))}` : '';
+  const windDir = mqttData?.windDir ? `DIR ${windDirDegree}°${maxGustStr}` : 'API Winds';
 
   const humidityVal = mqttData?.outHumidity ? Math.round(parseFloat(mqttData.outHumidity)) 
       : realData ? realData.current.relative_humidity_2m : '--';
