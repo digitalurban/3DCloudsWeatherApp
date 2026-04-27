@@ -4,7 +4,7 @@ import { Sky, Clouds, Cloud, OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Snow() {
-  const flakeCount = 6000;
+  const flakeCount = 2000;
   const positions = useMemo(() => {
     const p = new Float32Array(flakeCount * 3);
     for (let i = 0; i < flakeCount; i++) {
@@ -57,7 +57,7 @@ function Snow() {
 }
 
 function Rain({ heavy, drizzle, windSpeed = 0 }: { heavy?: boolean; drizzle?: boolean, windSpeed?: number }) {
-  const dropCount = drizzle ? 1000 : heavy ? 15000 : 5000;
+  const dropCount = drizzle ? 500 : heavy ? 6000 : 2000;
   
   // Calculate a wind multiplier. Cap it so the rain doesn't travel horizontally too crazily.
   // Assuming a max reasonable visual wind speed scalar around 30mph -> 30/10 = 3x multiplier
@@ -679,7 +679,7 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   }, [isClear, isPartlyCloudy, hasClouds, isHeavyRain, isFog, finalCloudColor]);
 
   return (
-    <Canvas camera={{ position: [0, 8, 20], fov: 65 }}>
+    <Canvas camera={{ position: [0, 8, 20], fov: 65 }} dpr={[1, 1.5]} frameloop="always">
       {isFog ? <fogExp2 attach="fog" color={!isDay ? '#060a10' : '#8a9cad'} density={0.06} /> : null}
       
       <Suspense fallback={null}>

@@ -61,7 +61,7 @@ export default function ScreenDrops({ wmoCode, rainRate }: { wmoCode: number, ra
   if (!isActive) return null;
 
   return (
-    <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden mix-blend-overlay opacity-80">
+    <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden opacity-60">
       {drops.map(d => (
         <motion.div
           key={d.id}
@@ -72,7 +72,7 @@ export default function ScreenDrops({ wmoCode, rainRate }: { wmoCode: number, ra
             y: [0, 0, Math.random() * 50 + 50, Math.random() * 100 + 100] 
           }}
           transition={{ duration: d.duration, ease: "easeIn" }}
-          className="absolute rounded-[50%] bg-white/30 backdrop-blur-md shadow-[inset_0_-2px_4px_rgba(255,255,255,0.6)]"
+          className="absolute rounded-[50%] bg-white/20 shadow-[inset_0_-2px_4px_rgba(255,255,255,0.4)]"
           style={{
             left: `${d.left}%`,
             top: `${d.top}%`,
