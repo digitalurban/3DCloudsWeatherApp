@@ -604,12 +604,12 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
   }
 
   // Set Lighting Intensities
-  let ambIntensity = THREE.MathUtils.lerp(0.1, 0.8, timeOfDayLightBlend) * baseWorldLight;
+  let ambIntensity = THREE.MathUtils.lerp(0.25, 0.8, timeOfDayLightBlend) * baseWorldLight;
   let dirIntensity = THREE.MathUtils.lerp(0.2, 1.5, timeOfDayLightBlend) * baseWorldLight;
 
   // Set Colors (Base Day vs Deep Night)
-  const currentCloudColor = new THREE.Color('#0b111a').lerp(new THREE.Color(baseCloudColor), timeOfDayLightBlend);
-  const currentLightColor = new THREE.Color('#507094').lerp(new THREE.Color('#ffffff'), timeOfDayLightBlend);
+  const currentCloudColor = new THREE.Color('#1e293b').lerp(new THREE.Color(baseCloudColor), timeOfDayLightBlend);
+  const currentLightColor = new THREE.Color('#7893b4').lerp(new THREE.Color('#ffffff'), timeOfDayLightBlend);
 
   // Inject Vibrant Sunset/Sunrise Hues
   if (sunsetFactor > 0) {
