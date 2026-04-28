@@ -695,9 +695,9 @@ export default function Scene({ wmoCode, currentTime, sunriseTime, sunsetTime, w
         <SmoothLighting 
           ambIntensity={ambIntensity} 
           dirIntensity={dirIntensity} 
-          sunX={sunX}
+          sunX={-sunX}
           sunY={Math.max(10, sunY)} 
-          sunZ={sunZ}
+          sunZ={-sunZ}
           finalDirLightColor={finalDirLightColor} 
           isDay={isDay} 
         />
